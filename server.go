@@ -17,9 +17,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"os"
 	"sync"
@@ -80,7 +80,7 @@ type Service struct {
 	ctx       context.Context
 	homedir   string
 	host      host.Host
-	router    *dht.IpfsDHT
+	router    routing.Routing
 	bootnodes []peer.AddrInfo
 }
 
@@ -88,12 +88,26 @@ func NewService(ctx context.Context, homedir string, port int, bootnodes []strin
 	log.Println("alibp2p.NewService", "homedir", homedir, "port", port)
 	priv, err := loadid(homedir)
 	//relayaddr, err := ma.NewMultiaddr("/p2p-circuit/ipfs/" + h3.ID().Pretty())
-
+	var router routing.Routing
 	host, err := libp2p.New(ctx,
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
-		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop))
+		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
+		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+			fmt.Println("New routing =========>")
+			if router == nil {
+				dht, err := dht.New(ctx, h,
+					opts.Client(false),
+					opts.Protocols(DefaultProtocols...))
+				if err != nil {
+					log.Println("dht-error", "err", err)
+					panic(err)
+				}
+				router = dht
+			}
+			return router, nil
+		}))
 
 	if err != nil {
 		panic(err)
@@ -103,15 +117,6 @@ func NewService(ctx context.Context, homedir string, port int, bootnodes []strin
 		full := addr.Encapsulate(hostAddr)
 		log.Println(i, "address", full)
 	}
-	dht, err := dht.New(ctx, host,
-		opts.Client(false),
-		opts.Protocols(DefaultProtocols...))
-	if err != nil {
-		log.Println("dht-error", "err", err)
-		panic(err)
-	}
-
-	routedHost := rhost.Wrap(host, dht)
 
 	host.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
 		log.Println("Got a new stream!")
@@ -138,11 +143,12 @@ func NewService(ctx context.Context, homedir string, port int, bootnodes []strin
 		bootpeers = convertPeers(bootnodes)
 	}
 
+	fmt.Println("New Service end =========>")
 	return &Service{
 		ctx:       ctx,
 		homedir:   homedir,
-		host:      routedHost,
-		router:    dht,
+		host:      host,
+		router:    router,
 		bootnodes: bootpeers,
 	}
 }
