@@ -35,7 +35,8 @@ import (
 
 var (
 	defBootnodes = []string{
-		"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
+		//"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
+		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 	}
 	ProtocolDHT      protocol.ID = "/pdx/kad/1.0.0"
 	DefaultProtocols             = []protocol.ID{ProtocolDHT}
