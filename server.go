@@ -158,7 +158,7 @@ func NewService(ctx context.Context, homedir string, port int, bootnodes []strin
 }
 
 func (self *Service) Connect(target string) error {
-
+	fmt.Println("000000000", self.host.Addrs())
 	ipfsaddr, err := ma.NewMultiaddr(target)
 	if err != nil {
 		log.Fatalln(err)
@@ -176,16 +176,14 @@ func (self *Service) Connect(target string) error {
 
 	// Decapsulate the /ipfs/<peerID> part from the target
 	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, _ := ma.NewMultiaddr(
-		fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-	// We have a peer ID and a targetAddr so we add it to the peerstore
-	// so LibP2P knows how to contact it
-	self.host.Peerstore().AddAddr(peerid, targetAddr, peerstore.PermanentAddrTTL)
-	log.Println("opening stream")
-	// make a new stream from host B to host A
-	// it should be handled on host A by the handler we set above because
-	// we use the same /echo/1.0.0 protocol
+	fmt.Println("111111", targetPeerAddr)
+	fmt.Println("222222", targetAddr)
+	fmt.Println("33333333", self.host.Peerstore().PeerInfo(peerid))
+	self.host.Peerstore().AddAddrs(peerid, []ma.Multiaddr{targetAddr, relayAddr}, peerstore.PermanentAddrTTL)
+	fmt.Println("44444444", self.host.Peerstore().PeerInfo(peerid))
 	s, err := self.host.NewStream(context.Background(), peerid, "/echo/1.0.0")
 	if err != nil {
 		log.Fatalln(err)
@@ -205,7 +203,7 @@ func (self *Service) Connect(target string) error {
 	return nil
 }
 func (self *Service) Start() {
-	fmt.Println("SSSSSSSSSSSS", self.host.Network().ListenAddresses())
+	fmt.Println("SSSSSSSSSSSS", self.host.Addrs(), self.host.Network().ListenAddresses(), self.host.Peerstore().PeerInfo(self.host.ID()))
 	err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
 	if err != nil {
 		panic(err)
@@ -267,8 +265,7 @@ func bootstrapConnect(ctx context.Context, ph host.Host, peers []peer.AddrInfo) 
 		go func(p peer.AddrInfo) {
 			defer wg.Done()
 			defer log.Println(ctx, "bootstrapDial", ph.ID(), p.ID)
-			log.Printf("%s bootstrapping to %s", ph.ID(), p.ID)
-
+			log.Printf("%s bootstrapping to %s : %v", ph.ID(), p.ID, p.Addrs)
 			ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 			if err := ph.Connect(ctx, p); err != nil {
 				log.Println(ctx, "bootstrapDialFailed", p.ID)
@@ -276,7 +273,7 @@ func bootstrapConnect(ctx context.Context, ph host.Host, peers []peer.AddrInfo) 
 				errs <- err
 				return
 			}
-			log.Println(ctx, "bootstrapDialSuccess", p.ID)
+			log.Println(ctx, "bootstrapDialSuccess", p.ID, ph.Peerstore().PeerInfo(p.ID))
 			log.Printf("bootstrapped with %v", p.ID)
 		}(p)
 	}

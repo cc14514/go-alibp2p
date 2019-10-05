@@ -2,6 +2,7 @@ package identify
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -216,6 +217,11 @@ func (ids *IDService) populateMessage(mes *pb.Identify, c network.Conn) {
 
 	// set listen addrs, get our latest addrs from Host.
 	laddrs := ids.Host.Addrs()
+	// add by liangc >>
+	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + ids.Host.ID().Pretty())
+	laddrs = append(laddrs, raddr)
+	// add by liangc <<
+	fmt.Println("<><><><><><><><> request", ids.Host.ID().Pretty(), laddrs)
 	mes.ListenAddrs = make([][]byte, len(laddrs))
 	for i, addr := range laddrs {
 		mes.ListenAddrs[i] = addr.Bytes()
@@ -271,6 +277,11 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 		}
 		lmaddrs = append(lmaddrs, maddr)
 	}
+	// add by liangc >>
+	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + p.Pretty())
+	lmaddrs = append(lmaddrs, raddr)
+	// add by liangc <<
+	fmt.Println("<><><><><><><><> response", p.Pretty(), lmaddrs)
 
 	// NOTE: Do not add `c.RemoteMultiaddr()` to the peerstore if the remote
 	// peer doesn't tell us to do so. Otherwise, we'll advertise it.
