@@ -87,14 +87,14 @@ type Service struct {
 func NewService(ctx context.Context, homedir string, port int, bootnodes []string) *Service {
 	log.Println("alibp2p.NewService", "homedir", homedir, "port", port)
 	priv, err := loadid(homedir)
-	hid, _ := peer.IDFromPublicKey(priv.GetPublic())
+	//hid, _ := peer.IDFromPublicKey(priv.GetPublic())
 	//relayaddr, err := ma.NewMultiaddr("/p2p-circuit/ipfs/" + h3.ID().Pretty())
 	var router routing.Routing
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
-	listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
+	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
 	host, err := libp2p.New(ctx,
 		//libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
-		libp2p.ListenAddrs(listen0, listen1),
+		libp2p.ListenAddrs(listen0),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
 		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
@@ -205,6 +205,7 @@ func (self *Service) Connect(target string) error {
 	return nil
 }
 func (self *Service) Start() {
+	fmt.Println("SSSSSSSSSSSS", self.host.Network().ListenAddresses())
 	err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
 	if err != nil {
 		panic(err)

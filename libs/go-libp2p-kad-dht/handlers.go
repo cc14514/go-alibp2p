@@ -12,13 +12,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 
-	proto "github.com/gogo/protobuf/proto"
-	cid "github.com/ipfs/go-cid"
+	"github.com/gogo/protobuf/proto"
+	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	u "github.com/ipfs/go-ipfs-util"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	recpb "github.com/libp2p/go-libp2p-record/pb"
-	base32 "github.com/whyrusleeping/base32"
+	"github.com/whyrusleeping/base32"
 )
 
 // The number of closer peers to send on requests.
@@ -285,6 +285,7 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, p peer.ID, pmes *pb.Mess
 	withAddresses := make([]peer.AddrInfo, 0, len(closestinfos))
 	for _, pi := range closestinfos {
 		if len(pi.Addrs) > 0 {
+			fmt.Println("handleFindPeer-->", pi.ID.Pretty(), pi.Addrs)
 			withAddresses = append(withAddresses, pi)
 		}
 	}
