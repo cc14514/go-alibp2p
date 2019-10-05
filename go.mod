@@ -28,3 +28,5 @@ go 1.13
 replace github.com/libp2p/go-libp2p-circuit => ./libs/go-libp2p-circuit
 
 replace github.com/libp2p/go-libp2p-kad-dht => ./libs/go-libp2p-kad-dht
+
+replace github.com/libp2p/go-libp2p => ./libs/go-libp2p

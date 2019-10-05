@@ -22,13 +22,10 @@ func main() {
 	}
 	p2pservice := alibp2p.NewService(context.Background(), *homedir, *port, nil)
 	go p2pservice.Start()
-	if target != nil && *target != "" {
-		//TODO 连接
-		fmt.Println("try connect ready ->", *target)
-		<- time.After(3 * time.Second)
-		fmt.Println("try connect start ->", *target)
-		<- time.After(3 * time.Second)
-		fmt.Println("target", target, "err", p2pservice.Connect(*target))
-	}
+	//if target != nil && *target != "" {
+	fmt.Println("try connect start ->", *target)
+	<-time.After(3 * time.Second)
+	fmt.Println("target", target, "err", p2pservice.Connect(*target))
+	//}
 	select {}
 }
