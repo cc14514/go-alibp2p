@@ -1,31 +1,138 @@
-// For test and demo alibp2p mod
 package main
 
 import (
+	"bufio"
 	"context"
-	"flag"
-	"fmt"
 	"github.com/cc14514/go-alibp2p"
+	"github.com/cc14514/go-lightrpc/rpcserver"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/urfave/cli"
+	"log"
+	"os"
+	"strings"
 	"time"
 )
 
 var (
-	homedir = flag.String("d", "/tmp", "home dir")
-	port    = flag.Int("p", 10000, "tcp listen")
-	target  = flag.String("t", "", "connect to")
+	homedir, target string
+	port            int
+	nodiscover      bool
+	p2pservice      *alibp2p.Service
+	ServiceRegMap   = make(map[string]rpcserver.ServiceReg)
+	genServiceReg   = func(namespace, version string, service interface{}) {
+		ServiceRegMap[namespace] = rpcserver.ServiceReg{
+			Namespace: namespace,
+			Version:   version,
+			Service:   service,
+		}
+	}
 )
 
+func init() {
+	vsn := "0.0.1"
+	genServiceReg("shell", vsn, &shellservice{})
+}
+
 func main() {
-	flag.Parse()
-	if homedir == nil || *homedir == "" {
-		panic("homedir can not empty.")
+	app := cli.NewApp()
+	app.Name = os.Args[0]
+	app.Usage = "JSON-RPC 接口框架"
+	app.Version = "0.0.1"
+	app.Author = "liangc"
+	app.Email = "cc14514@icloud.com"
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:        "nodiscover",
+			Usage:       "false to disable bootstrap",
+			Destination: &nodiscover,
+		},
+		cli.IntFlag{
+			Name:  "rpcport",
+			Usage: "HTTP-RPC server listening `PORT`",
+			Value: 8080,
+		},
+		cli.IntFlag{
+			Name:        "port",
+			Usage:       "service tcp port",
+			Value:       10000,
+			Destination: &port,
+		},
+		cli.StringFlag{
+			Name:        "homedir,d",
+			Usage:       "home dir",
+			Value:       "/tmp",
+			Destination: &homedir,
+		},
+		cli.StringFlag{
+			Name:        "target,t",
+			Usage:       "connect to ,split by ','",
+			Destination: &target,
+		},
 	}
-	p2pservice := alibp2p.NewService(context.Background(), *homedir, *port, nil)
-	go p2pservice.Start()
-	if target != nil && *target != "" {
-		fmt.Println("try connect start ->", *target)
-		<-time.After(3 * time.Second)
-		fmt.Println("target", target, "err", p2pservice.Connect(*target))
+	app.Before = func(ctx *cli.Context) error {
+		if homedir == "" {
+			panic("homedir can not empty.")
+		}
+		cfg := alibp2p.Config{
+			Ctx:       context.Background(),
+			Homedir:   homedir,
+			Port:      port,
+			Bootnodes: nil,
+			Discover:  !nodiscover,
+		}
+		p2pservice = alibp2p.NewService(cfg)
+		p2pservice.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
+			log.Println("Got a new stream!")
+			if err := func(s network.Stream) error {
+				buf := bufio.NewReader(s)
+				str, err := buf.ReadString('\n')
+				if err != nil {
+					return err
+				}
+
+				log.Printf("read: %s\n", str)
+				_, err = s.Write([]byte(str))
+				return err
+			}(s); err != nil {
+				log.Println(err)
+				s.Reset()
+			} else {
+				s.Close()
+			}
+		})
+		go p2pservice.Start()
+		if target != "" {
+			log.Println("try connect start ->", target)
+			<-time.After(3 * time.Second)
+			tarr := strings.Split(target, ",")
+			for _, t := range tarr {
+				log.Println("target", target, "err", p2pservice.Connect(t))
+			}
+		}
+		return nil
 	}
-	select {}
+	app.Action = func(ctx *cli.Context) error {
+		log.Println(">> Action on port =", ctx.GlobalInt("p"))
+		rs := &rpcserver.Rpcserver{
+			Port:       ctx.GlobalInt("rpcport"),
+			ServiceMap: ServiceRegMap,
+		}
+		rs.StartServer()
+		return nil
+	}
+	app.Run(os.Args)
+}
+
+type shellservice struct{}
+
+func (self *shellservice) Peers(params interface{}) rpcserver.Success {
+	peers := p2pservice.Peers()
+	return rpcserver.Success{
+		Sn:      "0",
+		Success: true,
+		Entity: struct {
+			Total int
+			Peers []string
+		}{len(peers), peers},
+	}
 }

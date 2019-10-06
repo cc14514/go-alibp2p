@@ -1,12 +1,12 @@
 package alibp2p
 
 import (
-	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"
@@ -21,16 +21,12 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
-	"os"
-	"sync"
-	"time"
-
 	"io/ioutil"
 	"log"
 	"math/big"
+	"os"
 	"path"
-
-	"errors"
+	"sync"
 )
 
 var (
@@ -82,30 +78,29 @@ type Service struct {
 	host      host.Host
 	router    routing.Routing
 	bootnodes []peer.AddrInfo
+	cfg       Config
 }
 
-func NewService(ctx context.Context, homedir string, port int, bootnodes []string) *Service {
-	log.Println("alibp2p.NewService", "homedir", homedir, "port", port)
-	priv, err := loadid(homedir)
+func NewService(cfg Config) *Service {
+	log.Println("alibp2p.NewService", cfg)
+	priv, err := loadid(cfg.Homedir)
 	//hid, _ := peer.IDFromPublicKey(priv.GetPublic())
 	//relayaddr, err := ma.NewMultiaddr("/p2p-circuit/ipfs/" + h3.ID().Pretty())
 	var router routing.Routing
-	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
+	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
 	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
-	host, err := libp2p.New(ctx,
+	host, err := libp2p.New(cfg.Ctx,
 		//libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
 		libp2p.ListenAddrs(listen0),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
 		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			fmt.Println("New routing =========>")
 			if router == nil {
-				dht, err := dht.New(ctx, h,
+				dht, err := dht.New(cfg.Ctx, h,
 					opts.Client(false),
 					opts.Protocols(DefaultProtocols...))
 				if err != nil {
-					log.Println("dht-error", "err", err)
 					panic(err)
 				}
 				router = dht
@@ -122,43 +117,27 @@ func NewService(ctx context.Context, homedir string, port int, bootnodes []strin
 		log.Println(i, "address", full)
 	}
 
-	host.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
-		log.Println("Got a new stream!")
-		if err := func(s network.Stream) error {
-			buf := bufio.NewReader(s)
-			str, err := buf.ReadString('\n')
-			if err != nil {
-				return err
-			}
-
-			log.Printf("read: %s\n", str)
-			_, err = s.Write([]byte(str))
-			return err
-		}(s); err != nil {
-			log.Println(err)
-			s.Reset()
-		} else {
-			s.Close()
-		}
-	})
-
 	bootpeers := convertPeers(defBootnodes)
-	if bootnodes != nil && len(bootnodes) > 0 {
-		bootpeers = convertPeers(bootnodes)
+	if cfg.Bootnodes != nil && len(cfg.Bootnodes) > 0 {
+		bootpeers = convertPeers(cfg.Bootnodes)
 	}
 
-	fmt.Println("New Service end =========>")
+	log.Println("New Service end =========>")
 	return &Service{
-		ctx:       ctx,
-		homedir:   homedir,
+		cfg:       cfg,
+		ctx:       cfg.Ctx,
+		homedir:   cfg.Homedir,
 		host:      host,
 		router:    router,
 		bootnodes: bootpeers,
 	}
 }
 
+func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)) {
+	self.host.SetStreamHandler(protocol.ID(pid), handler)
+}
+
 func (self *Service) Connect(target string) error {
-	fmt.Println("000000000", self.host.Addrs())
 	ipfsaddr, err := ma.NewMultiaddr(target)
 	if err != nil {
 		log.Fatalln(err)
@@ -174,16 +153,15 @@ func (self *Service) Connect(target string) error {
 		log.Fatalln(err)
 	}
 
+	//pi, _ := self.router.FindPeer(self.ctx, peerid)
+	//log.Println("pinfo", "id", peerid.Pretty(), pi)
+
 	// Decapsulate the /ipfs/<peerID> part from the target
 	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
 	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
 	relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-	fmt.Println("111111", targetPeerAddr)
-	fmt.Println("222222", targetAddr)
-	fmt.Println("33333333", self.host.Peerstore().PeerInfo(peerid))
 	self.host.Peerstore().AddAddrs(peerid, []ma.Multiaddr{targetAddr, relayAddr}, peerstore.PermanentAddrTTL)
-	fmt.Println("44444444", self.host.Peerstore().PeerInfo(peerid))
 	s, err := self.host.NewStream(context.Background(), peerid, "/echo/1.0.0")
 	if err != nil {
 		log.Fatalln(err)
@@ -203,7 +181,42 @@ func (self *Service) Connect(target string) error {
 	return nil
 }
 func (self *Service) Start() {
-	fmt.Println("SSSSSSSSSSSS", self.host.Addrs(), self.host.Network().ListenAddresses(), self.host.Peerstore().PeerInfo(self.host.ID()))
+	if self.cfg.Discover {
+		self.Bootstrap()
+	}
+	/*
+		tick := time.NewTicker(5 * time.Second)
+		for range tick.C {
+			fmt.Println(len(self.host.Network().Conns()), "--------------------------------->")
+			for j, c := range self.host.Network().Conns() {
+				//localaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.LocalPeer().Pretty()))
+				//remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+				//fmt.Println("=>", j, c.LocalMultiaddr().Encapsulate(localaddr), "->", c.RemoteMultiaddr().Encapsulate(remoteaddr))
+				remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+				maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
+				jj, _ := maddr.MarshalJSON()
+				tt, _ := maddr.MarshalText()
+				fmt.Println("peers >", j, "j=", string(jj), ", t=", string(tt))
+			}
+		}
+	*/
+}
+
+func (self *Service) Peers() []string {
+	var ret = make([]string, 0)
+	for _, c := range self.host.Network().Conns() {
+		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
+		taddr, _ := maddr.MarshalText()
+		ret = append(ret, string(taddr))
+	}
+	return ret
+}
+
+func (self *Service) Bootstrap() error {
+	log.Println("host-addrs", self.host.Addrs())
+	log.Println("host-network-listen", self.host.Network().ListenAddresses())
+	log.Println("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
 	err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
 	if err != nil {
 		panic(err)
@@ -211,27 +224,8 @@ func (self *Service) Start() {
 	// Bootstrap the host
 	err = self.router.Bootstrap(self.ctx)
 	if err != nil {
-		panic(err)
-	}
-
-	// TODO 连接 bootnode peer 并且启动 discover bootstrap
-	tick := time.NewTicker(5 * time.Second)
-	for range tick.C {
-		fmt.Println(len(self.host.Network().Conns()), "--------------------------------->")
-		for j, c := range self.host.Network().Conns() {
-			//localaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.LocalPeer().Pretty()))
-			//remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
-			//fmt.Println("=>", j, c.LocalMultiaddr().Encapsulate(localaddr), "->", c.RemoteMultiaddr().Encapsulate(remoteaddr))
-			remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
-			fmt.Println("peers >", j, c.RemoteMultiaddr().Encapsulate(remoteaddr))
-		}
-	}
-}
-
-func (self *Service) Bootstrap() error {
-	err := self.router.Bootstrap(self.ctx)
-	if err != nil {
 		log.Println("bootstrap-error", "err", err)
+		panic(err)
 	}
 	return err
 }

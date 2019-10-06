@@ -39,7 +39,6 @@ func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, err
 	if len(destaddr.Bytes()) > 0 {
 		dinfo.Addrs = append(dinfo.Addrs, destaddr)
 	}
-	fmt.Println(11111, "a=", relayaddr.Bytes(), "r=", r.relays)
 	if len(relayaddr.Bytes()) == 0 {
 		// unspecific relay address, try dialing using known hop relays
 		return r.tryDialRelays(ctx, *dinfo)
