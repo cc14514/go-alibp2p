@@ -146,6 +146,7 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 
 //http://localhost:8081/api/?body={"service":"shell","method":"echo","params":{"to":"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP","msg":"hello world"}}
 func (self *shellservice) Echo(params interface{}) rpcserver.Success {
+	log.Println("echo_params=", params)
 	args := params.(map[string]interface{})
 	log.Println("echo_args=", args)
 	to := args["to"].(string)

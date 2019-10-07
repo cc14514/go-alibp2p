@@ -2,7 +2,7 @@ module github.com/cc14514/go-alibp2p
 
 require (
 	github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
-	github.com/cc14514/go-lightrpc v0.0.0-20191006124726-a77c695f8c82
+	github.com/cc14514/go-lightrpc v0.0.0-20191007114427-e1782b451d7b
 	github.com/libp2p/go-libp2p v0.1.0
 	github.com/libp2p/go-libp2p-circuit v0.1.0
 	github.com/libp2p/go-libp2p-core v0.0.1

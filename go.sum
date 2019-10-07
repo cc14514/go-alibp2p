@@ -14,6 +14,8 @@ github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792/go.mod h1:ghJtE
 github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46fmI40EZs=
 github.com/cc14514/go-lightrpc v0.0.0-20191006124726-a77c695f8c82 h1:wn+Qxq4aEkB3hBQz++l0qovEZHxcpXLCH/fDkGY5me4=
 github.com/cc14514/go-lightrpc v0.0.0-20191006124726-a77c695f8c82/go.mod h1:jU5IztEXhp8V8Ytk7wVKI/pL65gPSVezAMlGIkjV0yM=
+github.com/cc14514/go-lightrpc v0.0.0-20191007114427-e1782b451d7b h1:3V1SSSG3Ocu1pEe2eJggIN2GRCKx7uXMRhlR9tUYkuo=
+github.com/cc14514/go-lightrpc v0.0.0-20191007114427-e1782b451d7b/go.mod h1:jU5IztEXhp8V8Ytk7wVKI/pL65gPSVezAMlGIkjV0yM=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmfM=
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
