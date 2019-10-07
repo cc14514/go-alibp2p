@@ -32,7 +32,7 @@ import (
 var (
 	defBootnodes = []string{
 		//"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
-		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
+		"/ip4/101.251.230.212/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 	}
 	ProtocolDHT      protocol.ID = "/pdx/kad/1.0.0"
 	DefaultProtocols             = []protocol.ID{ProtocolDHT}
@@ -89,8 +89,8 @@ func NewService(cfg Config) *Service {
 	var router routing.Routing
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
 	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
-	host, err := libp2p.New(cfg.Ctx,
-		//libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)),
+
+	optlist := []libp2p.Option{
 		libp2p.ListenAddrs(listen0),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
@@ -106,11 +106,18 @@ func NewService(cfg Config) *Service {
 				router = dht
 			}
 			return router, nil
-		}))
+		}),
+	}
+	if p, err := cfg.ProtectorOpt(); err == nil {
+		optlist = append(optlist, p)
+	}
+
+	host, err := libp2p.New(cfg.Ctx, optlist...)
 
 	if err != nil {
 		panic(err)
 	}
+
 	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
 		full := addr.Encapsulate(hostAddr)

@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	homedir, target string
-	port            int
-	nodiscover      bool
-	p2pservice      *alibp2p.Service
-	ServiceRegMap   = make(map[string]rpcserver.ServiceReg)
-	genServiceReg   = func(namespace, version string, service interface{}) {
+	homedir, target, bootnodes string
+	port, networkid            int
+	nodiscover                 bool
+	p2pservice                 *alibp2p.Service
+	ServiceRegMap              = make(map[string]rpcserver.ServiceReg)
+	genServiceReg              = func(namespace, version string, service interface{}) {
 		ServiceRegMap[namespace] = rpcserver.ServiceReg{
 			Namespace: namespace,
 			Version:   version,
@@ -58,6 +58,12 @@ func main() {
 			Value:       10000,
 			Destination: &port,
 		},
+		cli.IntFlag{
+			Name:        "networkid",
+			Usage:       "network id",
+			Value:       1,
+			Destination: &networkid,
+		},
 		cli.StringFlag{
 			Name:        "homedir,d",
 			Usage:       "home dir",
@@ -68,6 +74,11 @@ func main() {
 			Name:        "target,t",
 			Usage:       "connect to ,split by ','",
 			Destination: &target,
+		},
+		cli.StringFlag{
+			Name:        "bootnodes",
+			Usage:       "bootnode list split by ','",
+			Destination: &bootnodes,
 		},
 	}
 	app.Before = func(ctx *cli.Context) error {
@@ -80,7 +91,11 @@ func main() {
 			Port:      uint64(port),
 			Bootnodes: nil,
 			Discover:  !nodiscover,
-			Networkid: big.NewInt(1),
+			Networkid: big.NewInt(int64(networkid)),
+		}
+		if bootnodes != "" {
+			log.Println("bootnodes=", bootnodes)
+			cfg.Bootnodes = strings.Split(bootnodes, ",")
 		}
 		p2pservice = alibp2p.NewService(cfg)
 		p2pservice.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
