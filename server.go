@@ -144,8 +144,8 @@ func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)
 	self.host.SetStreamHandler(protocol.ID(pid), handler)
 }
 
-func (self *Service) Connect(target string) error {
-	ipfsaddr, err := ma.NewMultiaddr(target)
+func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream, error) {
+	ipfsaddr, err := ma.NewMultiaddr(to)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -159,54 +159,25 @@ func (self *Service) Connect(target string) error {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	//pi, _ := self.router.FindPeer(self.ctx, peerid)
-	//log.Println("pinfo", "id", peerid.Pretty(), pi)
-
-	// Decapsulate the /ipfs/<peerID> part from the target
-	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
 	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
 	relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 	self.host.Peerstore().AddAddrs(peerid, []ma.Multiaddr{targetAddr, relayAddr}, peerstore.PermanentAddrTTL)
-	s, err := self.host.NewStream(context.Background(), peerid, "/echo/1.0.0")
+	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	_, err = s.Write([]byte("Hello, world!\n"))
+	_, err = s.Write(msg)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	out, err := ioutil.ReadAll(s)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.Printf("read reply: %q\n", out)
-	return nil
+	return s, err
 }
+
 func (self *Service) Start() {
 	if self.cfg.Discover {
 		self.Bootstrap()
 	}
-	/*
-		tick := time.NewTicker(5 * time.Second)
-		for range tick.C {
-			fmt.Println(len(self.host.Network().Conns()), "--------------------------------->")
-			for j, c := range self.host.Network().Conns() {
-				//localaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.LocalPeer().Pretty()))
-				//remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
-				//fmt.Println("=>", j, c.LocalMultiaddr().Encapsulate(localaddr), "->", c.RemoteMultiaddr().Encapsulate(remoteaddr))
-				remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
-				maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
-				jj, _ := maddr.MarshalJSON()
-				tt, _ := maddr.MarshalText()
-				fmt.Println("peers >", j, "j=", string(jj), ", t=", string(tt))
-			}
-		}
-	*/
 }
 
 func (self *Service) Peers() []string {

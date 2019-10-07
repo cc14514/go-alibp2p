@@ -7,20 +7,22 @@ import (
 	"github.com/cc14514/go-lightrpc/rpcserver"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/urfave/cli"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
 	"strings"
-	"time"
 )
 
+const echopid = "/echo/1.0.0"
+
 var (
-	homedir, target, bootnodes string
-	port, networkid            int
-	nodiscover                 bool
-	p2pservice                 *alibp2p.Service
-	ServiceRegMap              = make(map[string]rpcserver.ServiceReg)
-	genServiceReg              = func(namespace, version string, service interface{}) {
+	homedir, bootnodes string
+	port, networkid    int
+	nodiscover         bool
+	p2pservice         *alibp2p.Service
+	ServiceRegMap      = make(map[string]rpcserver.ServiceReg)
+	genServiceReg      = func(namespace, version string, service interface{}) {
 		ServiceRegMap[namespace] = rpcserver.ServiceReg{
 			Namespace: namespace,
 			Version:   version,
@@ -71,11 +73,6 @@ func main() {
 			Destination: &homedir,
 		},
 		cli.StringFlag{
-			Name:        "target,t",
-			Usage:       "connect to ,split by ','",
-			Destination: &target,
-		},
-		cli.StringFlag{
 			Name:        "bootnodes",
 			Usage:       "bootnode list split by ','",
 			Destination: &bootnodes,
@@ -98,7 +95,7 @@ func main() {
 			cfg.Bootnodes = strings.Split(bootnodes, ",")
 		}
 		p2pservice = alibp2p.NewService(cfg)
-		p2pservice.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
+		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
 			log.Println("Got a new stream!")
 			if err := func(s network.Stream) error {
 				buf := bufio.NewReader(s)
@@ -118,14 +115,6 @@ func main() {
 			}
 		})
 		go p2pservice.Start()
-		if target != "" {
-			log.Println("try connect start ->", target)
-			<-time.After(3 * time.Second)
-			tarr := strings.Split(target, ",")
-			for _, t := range tarr {
-				log.Println("target", target, "err", p2pservice.Connect(t))
-			}
-		}
 		return nil
 	}
 	app.Action = func(ctx *cli.Context) error {
@@ -142,6 +131,7 @@ func main() {
 
 type shellservice struct{}
 
+//http://localhost:8081/api/?body={"service":"shell","method":"peers"}
 func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 	peers := p2pservice.Peers()
 	return rpcserver.Success{
@@ -151,5 +141,33 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 			Total int
 			Peers []string
 		}{len(peers), peers},
+	}
+}
+
+//http://localhost:8081/api/?body={"service":"shell","method":"echo","params":{"to":"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP","msg":"hello world"}}
+func (self *shellservice) Echo(params interface{}) rpcserver.Success {
+	args := params.(map[string]interface{})
+	log.Println("echo_args=", args)
+	to := args["to"].(string)
+	msg := args["msg"].(string)
+	s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
+	rtn := ""
+	success := true
+	if err != nil {
+		rtn = err.Error()
+		success = false
+	} else {
+		buf, err := ioutil.ReadAll(s)
+		rtn = string(buf)
+		if err != nil {
+			s.Reset()
+		} else {
+			s.Close()
+		}
+	}
+	return rpcserver.Success{
+		Sn:      "0",
+		Success: success,
+		Entity:  rtn,
 	}
 }
