@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/urfave/cli"
 	"log"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -76,9 +77,10 @@ func main() {
 		cfg := alibp2p.Config{
 			Ctx:       context.Background(),
 			Homedir:   homedir,
-			Port:      port,
+			Port:      uint64(port),
 			Bootnodes: nil,
 			Discover:  !nodiscover,
+			Networkid: big.NewInt(1),
 		}
 		p2pservice = alibp2p.NewService(cfg)
 		p2pservice.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
