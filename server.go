@@ -151,8 +151,15 @@ func NewService(cfg Config) *Service {
 	}
 }
 
-func (self *Service) Myid() string {
-	return self.host.ID().Pretty()
+func (self *Service) Myid() map[string]interface{} {
+	addrs := make([]string, 0)
+	for _, maddr := range self.host.Addrs() {
+		addrs = append(addrs, maddr.String())
+	}
+	return map[string]interface{}{
+		"Id":    self.host.ID().Pretty(),
+		"Addrs": addrs,
+	}
 }
 
 func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)) {
