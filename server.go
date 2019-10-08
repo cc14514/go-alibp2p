@@ -29,15 +29,20 @@ import (
 	"sync"
 )
 
+const (
+	ProtocolDHT  protocol.ID = "/pdx/kad/1.0.0"
+	NamespaceDHT             = "cc14514"
+)
+
 var (
 	defBootnodes = []string{
 		//"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 		"/ip4/101.251.230.212/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 	}
-	ProtocolDHT      protocol.ID = "/pdx/kad/1.0.0"
-	DefaultProtocols             = []protocol.ID{ProtocolDHT}
-	curve                        = btcec.S256()
-	loadid                       = func(homedir string) (crypto.PrivKey, error) {
+
+	DefaultProtocols = []protocol.ID{ProtocolDHT}
+	curve            = btcec.S256()
+	loadid           = func(homedir string) (crypto.PrivKey, error) {
 		keypath := path.Join(homedir, "p2p.id")
 		log.Println("keypath", keypath)
 		buff1, err := ioutil.ReadFile(keypath)
@@ -72,14 +77,20 @@ var (
 	}
 )
 
-type Service struct {
-	ctx       context.Context
-	homedir   string
-	host      host.Host
-	router    routing.Routing
-	bootnodes []peer.AddrInfo
-	cfg       Config
-}
+type (
+	Service struct {
+		ctx       context.Context
+		homedir   string
+		host      host.Host
+		router    routing.Routing
+		bootnodes []peer.AddrInfo
+		cfg       Config
+	}
+	blankValidator struct{}
+)
+
+func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
+func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
 
 func NewService(cfg Config) *Service {
 	log.Println("alibp2p.NewService", cfg)
@@ -99,6 +110,7 @@ func NewService(cfg Config) *Service {
 			if router == nil {
 				dht, err := dht.New(cfg.Ctx, h,
 					opts.Client(false),
+					opts.NamespacedValidator(NamespaceDHT, blankValidator{}),
 					opts.Protocols(DefaultProtocols...))
 				if err != nil {
 					panic(err)
@@ -189,6 +201,14 @@ func (self *Service) Peers() []string {
 		ret = append(ret, string(taddr))
 	}
 	return ret
+}
+
+func (self *Service) Put(k string, v []byte) error {
+	return self.router.PutValue(self.ctx, fmt.Sprintf("/%s/%s", NamespaceDHT, k), v)
+}
+
+func (self *Service) Get(k string) ([]byte, error) {
+	return self.router.GetValue(self.ctx, fmt.Sprintf("/%s/%s", NamespaceDHT, k))
 }
 
 func (self *Service) Bootstrap() error {

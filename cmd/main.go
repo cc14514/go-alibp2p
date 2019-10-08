@@ -135,7 +135,6 @@ type shellservice struct{}
 func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 	peers := p2pservice.Peers()
 	return rpcserver.Success{
-		Sn:      "0",
 		Success: true,
 		Entity: struct {
 			Total int
@@ -167,7 +166,45 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 		}
 	}
 	return rpcserver.Success{
-		Sn:      "0",
+		Success: success,
+		Entity:  rtn,
+	}
+}
+
+func (self *shellservice) Put(params interface{}) rpcserver.Success {
+	log.Println("put_params=", params)
+	args := params.(map[string]interface{})
+	log.Println("put_args=", args)
+	k := args["key"].(string)
+	v := args["val"].(string)
+	success := true
+	rtn := ""
+	err := p2pservice.Put(k, []byte(v))
+	if err != nil {
+		success = false
+		rtn = err.Error()
+	}
+	return rpcserver.Success{
+		Success: success,
+		Entity:  rtn,
+	}
+}
+
+func (self *shellservice) Get(params interface{}) rpcserver.Success {
+	log.Println("get_params=", params)
+	args := params.(map[string]interface{})
+	log.Println("get_args=", args)
+	k := args["key"].(string)
+	success := true
+	rtn := ""
+	b, err := p2pservice.Get(k)
+	if err != nil {
+		success = false
+		rtn = err.Error()
+	} else {
+		rtn = string(b)
+	}
+	return rpcserver.Success{
 		Success: success,
 		Entity:  rtn,
 	}
