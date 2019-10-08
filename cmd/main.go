@@ -246,6 +246,25 @@ func (self *shellservice) Myid(params interface{}) rpcserver.Success {
 	}
 }
 
+func (self *shellservice) Findpeer(params interface{}) rpcserver.Success {
+	s := time.Now()
+	log.Println("get_params=", params)
+	args := params.(map[string]interface{})
+	log.Println("get_args=", args)
+	id := args["id"].(string)
+	var rtn interface{}
+	pi, err := p2pservice.Findpeer(id)
+	if err != nil {
+		rtn = err.Error()
+	} else {
+		rtn = pi
+	}
+	return rpcserver.Success{
+		Success: true,
+		Entity:  apiret{time.Since(s).String(), rtn},
+	}
+}
+
 func AttachCmd(ctx *cli.Context) error {
 	<-time.After(time.Second)
 	go func() {
@@ -266,7 +285,6 @@ func AttachCmd(ctx *cli.Context) error {
 					fmt.Println("bye bye ^_^ ")
 					return
 				default:
-					log.Println(cmd)
 					if fn, ok := Funcs[cmdArg[0]]; ok {
 						if r, err := fn(cmdArg[1:]...); err != nil {
 							log.Println(err)
@@ -275,6 +293,7 @@ func AttachCmd(ctx *cli.Context) error {
 						}
 					} else {
 						fmt.Println("not support : ", cmdArg[0])
+						Funcs["help"]()
 					}
 				}
 			}
@@ -285,12 +304,18 @@ func AttachCmd(ctx *cli.Context) error {
 }
 
 var (
-	apiurl  = func(port int) string { return fmt.Sprintf("http://localhost:%d/api/?body=", port) }
+	apiurl   = func(port int) string { return fmt.Sprintf("http://localhost:%d/api/?body=", port) }
+	api_echo = func(k, v string) string {
+		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"echo","params":{"to":"%s","msg":"%s"}}`, k, v)
+	}
 	api_put = func(k, v string) string {
 		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"put","params":{"key":"%s","val":"%s"}}`, k, v)
 	}
 	api_get = func(k string) string {
 		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"get","params":{"key":"%s"}}`, k)
+	}
+	api_findpeer = func(k string) string {
+		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"findpeer","params":{"id":"%s"}}`, k)
 	}
 	api_peers = func() string {
 		return apiurl(rpcport) + `{"service":"shell","method":"peers"}`
@@ -308,6 +333,30 @@ var (
 		fmt.Println()
 	}
 	Funcs = map[string]cmdFn{
+		"help": func(args ...string) (interface{}, error) {
+			fmt.Println("------------------------------")
+			fmt.Println("echo [id/url] [msg]")
+			fmt.Println("put [key] [val]")
+			fmt.Println("get [key]")
+			fmt.Println("findpeer [id]")
+			fmt.Println("peers")
+			fmt.Println("myid")
+			fmt.Println("help , exit , quit")
+			fmt.Println("------------------------------")
+			return nil, nil
+		},
+		"echo": func(args ...string) (interface{}, error) {
+			to, msg := args[0], args[1]
+			resp, err := http.Get(api_echo(to, msg))
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
 		"put": func(args ...string) (interface{}, error) {
 			k, v := args[0], args[1]
 			resp, err := http.Get(api_put(k, v))
@@ -323,6 +372,18 @@ var (
 		"get": func(args ...string) (interface{}, error) {
 			k := args[0]
 			resp, err := http.Get(api_get(k))
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+		"findpeer": func(args ...string) (interface{}, error) {
+			k := args[0]
+			resp, err := http.Get(api_findpeer(k))
 			if err != nil {
 				log.Println("error", err)
 			}

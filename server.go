@@ -234,6 +234,14 @@ func (self *Service) Peers() (direct []string, relay []string) {
 	return direct, relay
 }
 
+func (self *Service) Findpeer(id string) (peer.AddrInfo, error) {
+	peerid, err := peer.IDB58Decode(id)
+	if err != nil {
+		return peer.AddrInfo{}, err
+	}
+	return self.router.FindPeer(self.ctx, peerid)
+}
+
 func (self *Service) Put(k string, v []byte) error {
 	return self.router.PutValue(self.ctx, fmt.Sprintf("/%s/%s", NamespaceDHT, k), v)
 }
