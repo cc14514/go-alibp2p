@@ -1,6 +1,6 @@
 # go-alibp2p
 
->用 go-libp2p 实现的全联通 dht 网络，适合做 p2p 网络应用，如内容分享与区块链等，同时适合嵌入式环境，main 函数中提供了一些使用样例，如题如下
+>此服务用 go-libp2p 实现的全连通 dht 网络，适合做 p2p 网络应用，如内容分享与区块链等，同时适合嵌入式环境，main 函数中简单演示了一些使用样例
 
 ## 编译
 
@@ -45,7 +45,9 @@ GLOBAL OPTIONS:
 
 >使用默认参数启动节点，将会连接到我提供的测试网络中，可以在控制台看到一些 peer ，如果想建立私有网络，请使用自己的 `networkid` 和 `bootnodes` ，其中 `bootnodes` 应该是一个使用了 `nodiscover` 参数启动的节点，启动成功后日志中会有对应的 `url` 信息
 
-* 启动一个 bootnode 节点
+* 启动一个 bootnode
+
+可以启动多个 bootnode 用来增强可用性
 
 ```bash
 $> alibp2p --nodiscover --networkid 2015061320170611
@@ -63,7 +65,7 @@ localhost:cmd liangc$ go run main.go --nodiscover --networkid 2015061320170611
 
 此时我们的 `bootnode url` 为 `/ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe`
 
-* 启动跟随节点
+* 使用 bootnode 组网
 
 ```bash
 $> alibp2p --networkid 2015061320170611 --bootnodes /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe 
