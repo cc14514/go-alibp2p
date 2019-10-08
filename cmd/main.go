@@ -229,6 +229,13 @@ func (self *shellservice) Get(params interface{}) rpcserver.Success {
 	}
 }
 
+func (self *shellservice) Myid(params interface{}) rpcserver.Success {
+	return rpcserver.Success{
+		Success: true,
+		Entity:  p2pservice.Myid(),
+	}
+}
+
 func AttachCmd(ctx *cli.Context) error {
 	<-time.After(time.Second)
 	go func() {

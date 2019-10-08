@@ -151,6 +151,10 @@ func NewService(cfg Config) *Service {
 	}
 }
 
+func (self *Service) Myid() string {
+	return self.host.ID().Pretty()
+}
+
 func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)) {
 	self.host.SetStreamHandler(protocol.ID(pid), handler)
 }
