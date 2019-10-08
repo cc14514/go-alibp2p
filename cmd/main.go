@@ -45,7 +45,7 @@ func init() {
 func main() {
 	app := cli.NewApp()
 	app.Name = os.Args[0]
-	app.Usage = "JSON-RPC 接口框架"
+	app.Usage = "用来演示 go-alibp2p 的组网和通信功能"
 	app.Version = "0.0.1"
 	app.Author = "liangc"
 	app.Email = "cc14514@icloud.com"
@@ -89,7 +89,7 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name:   "attach",
-			Usage:  "连接本地已启动的进程",
+			Usage:  "得到一个 shell 用来操作本地已启动的节点",
 			Action: AttachCmd,
 		},
 	}
