@@ -157,7 +157,8 @@
     <MESSAGE value="功能调整，与日志清理" />
     <MESSAGE value="clean log" />
     <MESSAGE value="增加 log" />
-    <option name="LAST_COMMIT_MESSAGE" value="增加 log" />
+    <MESSAGE value="readme" />
+    <option name="LAST_COMMIT_MESSAGE" value="readme" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>

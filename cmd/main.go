@@ -273,7 +273,7 @@ func AttachCmd(ctx *cli.Context) error {
 		fmt.Println("hello world")
 		fmt.Println("------------")
 		for {
-			fmt.Print("cmd #>")
+			fmt.Print("cmd$> ")
 			ir := bufio.NewReader(os.Stdin)
 			if cmd, err := ir.ReadString('\n'); err == nil && strings.Trim(cmd, " ") != "\n" {
 				cmd = strings.Trim(cmd, " ")
