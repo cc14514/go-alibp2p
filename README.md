@@ -43,10 +43,10 @@ GLOBAL OPTIONS:
    --version, -v              print the version
 ```
 
+
+### bootnode
+
 >使用默认参数启动节点，将会连接到我提供的测试网络中，可以在控制台看到一些 peer ，如果想建立私有网络，请使用自己的 `networkid` 和 `bootnodes` ，其中 `bootnodes` 应该是一个使用了 `nodiscover` 参数启动的节点，启动成功后日志中会有对应的 `url` 信息
-
-### 启动一个 bootnode
-
 >可以启动多个 bootnode 用来增强可用性
 
 ```bash
@@ -65,7 +65,9 @@ localhost:cmd liangc$ go run main.go --nodiscover --networkid 2015061320170611
 
 此时我们的 `bootnode url` 为 `/ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe`
 
-### 使用 bootnode 组网
+### 组网
+
+>组网就是使用前面启动的 bootnode 来启动其他节点
 
 ```bash
 $> alibp2p --networkid 2015061320170611 --bootnodes /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe 
