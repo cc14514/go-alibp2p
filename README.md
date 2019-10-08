@@ -10,7 +10,7 @@ cd go-alibp2p/cmd
 go build -o alibp2p main.go
 ```
 
-## 启动节点
+## 启动
 
 * 参数
 
@@ -43,7 +43,7 @@ GLOBAL OPTIONS:
    --version, -v              print the version
 ```
 
->使用默认参数启动节点，将会连接到我提供的测试网络中，可以在控制台看到一些 peer ，如果想建立私有网络，请使用自己的 networkid 和 bootnodes ，其中 bootnodes 应该是一个使用了 nodiscover 参数启动的节点，启动成功后日志中会有对应的 url 信息
+>使用默认参数启动节点，将会连接到我提供的测试网络中，可以在控制台看到一些 peer ，如果想建立私有网络，请使用自己的 `networkid` 和 `bootnodes` ，其中 `bootnodes` 应该是一个使用了 `nodiscover` 参数启动的节点，启动成功后日志中会有对应的 `url` 信息
 
 * 启动一个 bootnode 节点
 
@@ -61,14 +61,13 @@ localhost:cmd liangc$ go run main.go --nodiscover --networkid 2015061320170611
 2019/10/08 18:14:19 host = :8080
 ```
 
-此时我们的 bootnode url 为 /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe
+此时我们的 `bootnode url` 为 `/ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe`
 
 * 启动跟随节点
 
 ```bash
 $> alibp2p --networkid 2015061320170611 --bootnodes /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe 
 ```
-
 
 ## 控制台
 
@@ -79,6 +78,7 @@ $> alibp2p attach
 ------------
 hello world
 ------------
+
 cmd$> help
 ------------------------------
 echo [id/url] [msg]
@@ -89,6 +89,26 @@ peers
 myid
 help , exit , quit
 ------------------------------
+
+cmd$> peers
+{
+	"success": true,
+	"entity": {
+		"Direct": [
+			"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP"
+		],
+		"Relay": [
+			"/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP/p2p-circuit/ipfs/16Uiu2HAm1tx8KP6cgbuD8ZbG8ca8eaVKusy6EmC3yA2CLCRAN6vn",
+			"/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP/p2p-circuit/ipfs/16Uiu2HAm13zcweNavz7Jxbjujymgb9X1WN5MdrMjgod4fKmQVfiM",
+			"/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP/p2p-circuit/ipfs/16Uiu2HAmUnYJQPeRJXoynqurHzCe8vASfArqXX58YyoihWpizxxF",
+			"/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP/p2p-circuit/ipfs/16Uiu2HAm9fLbABEV2R2NWE1qj13N4wx1r1KTff1ZYPEqgy11q5Px",
+			......
+		],
+		"TimeUsed": "722.891µs",
+		"Total": 37
+	}
+}
+
 cmd$> findpeer 16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP
 {
 	"success": true,
@@ -105,6 +125,7 @@ cmd$> findpeer 16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP
 		"TimeUsed": "41.226µs"
 	}
 }
+
 cmd$> echo 16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP hello
 {
 	"success": true,
@@ -113,5 +134,6 @@ cmd$> echo 16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP hello
 		"TimeUsed": "6.727691ms"
 	}
 }
+
 cmd$> exit
 ```
