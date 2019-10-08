@@ -2,6 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e027093b-f9e0-4f2d-9f52-fe7b8cea8fb1" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/config_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/libs/go-libp2p-circuit/relay.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p-circuit/relay.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/libs/go-libp2p-kad-dht/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p-kad-dht/handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/libs/go-libp2p/p2p/host/basic/basic_host.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p/p2p/host/basic/basic_host.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/libs/go-libp2p/p2p/protocol/identify/id.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p/p2p/protocol/identify/id.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/server.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -64,7 +71,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Go Test.TestApiPost in github.com/cc14514/go-alibp2p/cmd">
+  <component name="RunManager" selected="Go Test.TestID in github.com/cc14514/go-alibp2p">
     <configuration name="go build github.com/cc14514/go-alibp2p/cmd" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
       <module name="go-alibp2p" />
       <working_directory value="$PROJECT_DIR$" />
@@ -96,6 +103,17 @@
       <pattern value="^TestApiPost$" />
       <method v="2" />
     </configuration>
+    <configuration name="TestID in github.com/cc14514/go-alibp2p" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="go-alibp2p" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/cc14514/go-alibp2p" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestID$" />
+      <method v="2" />
+    </configuration>
     <configuration name="TestPSK in github.com/cc14514/go-alibp2p" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
       <module name="go-alibp2p" />
       <working_directory value="$PROJECT_DIR$" />
@@ -109,6 +127,7 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Go Test.TestID in github.com/cc14514/go-alibp2p" />
         <item itemvalue="Go Test.TestApiPost in github.com/cc14514/go-alibp2p/cmd" />
         <item itemvalue="Go Test.TestApi in github.com/cc14514/go-alibp2p/cmd" />
         <item itemvalue="Go Test.TestPSK in github.com/cc14514/go-alibp2p" />

@@ -285,7 +285,6 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, p peer.ID, pmes *pb.Mess
 	withAddresses := make([]peer.AddrInfo, 0, len(closestinfos))
 	for _, pi := range closestinfos {
 		if len(pi.Addrs) > 0 {
-			fmt.Println("handleFindPeer-->", pi.ID.Pretty(), pi.Addrs)
 			withAddresses = append(withAddresses, pi)
 		}
 	}

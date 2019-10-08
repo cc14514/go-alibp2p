@@ -2,7 +2,6 @@ package basichost
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -486,7 +485,7 @@ func (h *BasicHost) Connect(ctx context.Context, pi peer.AddrInfo) error {
 	}
 
 	resolved, err := h.resolveAddrs(ctx, h.Peerstore().PeerInfo(pi.ID))
-	fmt.Println("resolved", resolved)
+	//fmt.Println("resolved", resolved)
 	if err != nil {
 		return err
 	}

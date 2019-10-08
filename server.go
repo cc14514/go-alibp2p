@@ -26,6 +26,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"strings"
 	"sync"
 )
 
@@ -167,31 +168,47 @@ func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream, error) {
-	ipfsaddr, err := ma.NewMultiaddr(to)
+	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
-		log.Fatalln(err)
+		ipfsaddr, err := ma.NewMultiaddr(to)
+		if err != nil {
+			log.Fatalln(err)
+			return nil, err
+		}
+
+		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+		if err != nil {
+			log.Fatalln(err)
+			return nil, err
+		}
+		peerid, err = peer.IDB58Decode(pid)
+		if err != nil {
+			log.Fatalln(err)
+			return nil, err
+		}
+		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+		targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
+		relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
+		raddr := []ma.Multiaddr{relayAddr, targetAddr}
+		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.PermanentAddrTTL)
+	} else {
+		pi, err := self.router.FindPeer(self.ctx, peerid)
+		if err != nil {
+			log.Fatalln(err)
+			return nil, err
+		}
+		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	}
 
-	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	peerid, err := peer.IDB58Decode(pid)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
-	relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
-	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-	self.host.Peerstore().AddAddrs(peerid, []ma.Multiaddr{targetAddr, relayAddr}, peerstore.PermanentAddrTTL)
 	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
 	if err != nil {
 		log.Fatalln(err)
+		return nil, err
 	}
 	_, err = s.Write(msg)
 	if err != nil {
 		log.Fatalln(err)
+		return nil, err
 	}
 	return s, err
 }
@@ -202,15 +219,19 @@ func (self *Service) Start() {
 	}
 }
 
-func (self *Service) Peers() []string {
-	var ret = make([]string, 0)
+func (self *Service) Peers() (direct []string, relay []string) {
+	direct, relay = make([]string, 0), make([]string, 0)
 	for _, c := range self.host.Network().Conns() {
 		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
 		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
 		taddr, _ := maddr.MarshalText()
-		ret = append(ret, string(taddr))
+		if strings.Contains(string(taddr), "p2p-circuit") {
+			relay = append(relay, string(taddr))
+		} else {
+			direct = append(direct, string(taddr))
+		}
 	}
-	return ret
+	return direct, relay
 }
 
 func (self *Service) Put(k string, v []byte) error {

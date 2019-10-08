@@ -147,50 +147,59 @@ func main() {
 
 type (
 	shellservice struct{}
-	cmdFn        func(args ...string) (interface{}, error)
+	apiret       struct {
+		TimeUsed string
+		Data     interface{}
+	}
+	cmdFn func(args ...string) (interface{}, error)
 )
 
 //http://localhost:8081/api/?body={"service":"shell","method":"peers"}
 func (self *shellservice) Peers(params interface{}) rpcserver.Success {
-	peers := p2pservice.Peers()
+	s := time.Now()
+	direct, relay := p2pservice.Peers()
 	return rpcserver.Success{
 		Success: true,
 		Entity: struct {
-			Total int
-			Peers []string
-		}{len(peers), peers},
+			TimeUsed string
+			Total    int
+			Direct   []string
+			Relay    []string
+		}{time.Since(s).String(), len(direct) + len(relay), direct, relay},
 	}
 }
 
 //http://localhost:8081/api/?body={"service":"shell","method":"echo","params":{"to":"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP","msg":"hello world"}}
 func (self *shellservice) Echo(params interface{}) rpcserver.Success {
+	s := time.Now()
 	log.Println("echo_params=", params)
 	args := params.(map[string]interface{})
 	log.Println("echo_args=", args)
 	to := args["to"].(string)
 	msg := args["msg"].(string)
-	s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
+	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
 	rtn := ""
 	success := true
 	if err != nil {
 		rtn = err.Error()
 		success = false
 	} else {
-		buf, err := ioutil.ReadAll(s)
+		buf, err := ioutil.ReadAll(_s)
 		rtn = string(buf)
 		if err != nil {
-			s.Reset()
+			_s.Reset()
 		} else {
-			s.Close()
+			_s.Close()
 		}
 	}
 	return rpcserver.Success{
 		Success: success,
-		Entity:  rtn,
+		Entity:  apiret{time.Since(s).String(), rtn},
 	}
 }
 
 func (self *shellservice) Put(params interface{}) rpcserver.Success {
+	s := time.Now()
 	log.Println("put_params=", params)
 	args := params.(map[string]interface{})
 	log.Println("put_args=", args)
@@ -205,11 +214,12 @@ func (self *shellservice) Put(params interface{}) rpcserver.Success {
 	}
 	return rpcserver.Success{
 		Success: success,
-		Entity:  rtn,
+		Entity:  apiret{time.Since(s).String(), rtn},
 	}
 }
 
 func (self *shellservice) Get(params interface{}) rpcserver.Success {
+	s := time.Now()
 	log.Println("get_params=", params)
 	args := params.(map[string]interface{})
 	log.Println("get_args=", args)
@@ -225,7 +235,7 @@ func (self *shellservice) Get(params interface{}) rpcserver.Success {
 	}
 	return rpcserver.Success{
 		Success: success,
-		Entity:  rtn,
+		Entity:  apiret{time.Since(s).String(), rtn},
 	}
 }
 
