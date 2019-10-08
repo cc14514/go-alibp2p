@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/cc14514/go-alibp2p"
 	"github.com/cc14514/go-lightrpc/rpcserver"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -10,19 +13,22 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 const echopid = "/echo/1.0.0"
 
 var (
-	homedir, bootnodes string
-	port, networkid    int
-	nodiscover         bool
-	p2pservice         *alibp2p.Service
-	ServiceRegMap      = make(map[string]rpcserver.ServiceReg)
-	genServiceReg      = func(namespace, version string, service interface{}) {
+	Stop                     = make(chan struct{})
+	homedir, bootnodes       string
+	port, networkid, rpcport int
+	nodiscover               bool
+	p2pservice               *alibp2p.Service
+	ServiceRegMap            = make(map[string]rpcserver.ServiceReg)
+	genServiceReg            = func(namespace, version string, service interface{}) {
 		ServiceRegMap[namespace] = rpcserver.ServiceReg{
 			Namespace: namespace,
 			Version:   version,
@@ -50,9 +56,10 @@ func main() {
 			Destination: &nodiscover,
 		},
 		cli.IntFlag{
-			Name:  "rpcport",
-			Usage: "HTTP-RPC server listening `PORT`",
-			Value: 8080,
+			Name:        "rpcport",
+			Usage:       "HTTP-RPC server listening `PORT`",
+			Value:       8080,
+			Destination: &rpcport,
 		},
 		cli.IntFlag{
 			Name:        "port",
@@ -78,7 +85,19 @@ func main() {
 			Destination: &bootnodes,
 		},
 	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:   "attach",
+			Usage:  "连接本地已启动的进程",
+			Action: AttachCmd,
+		},
+	}
+
 	app.Before = func(ctx *cli.Context) error {
+		return nil
+	}
+	app.Action = func(ctx *cli.Context) error {
 		if homedir == "" {
 			panic("homedir can not empty.")
 		}
@@ -115,9 +134,6 @@ func main() {
 			}
 		})
 		go p2pservice.Start()
-		return nil
-	}
-	app.Action = func(ctx *cli.Context) error {
 		log.Println(">> Action on port =", ctx.GlobalInt("p"))
 		rs := &rpcserver.Rpcserver{
 			Port:       ctx.GlobalInt("rpcport"),
@@ -129,7 +145,10 @@ func main() {
 	app.Run(os.Args)
 }
 
-type shellservice struct{}
+type (
+	shellservice struct{}
+	cmdFn        func(args ...string) (interface{}, error)
+)
 
 //http://localhost:8081/api/?body={"service":"shell","method":"peers"}
 func (self *shellservice) Peers(params interface{}) rpcserver.Success {
@@ -209,3 +228,100 @@ func (self *shellservice) Get(params interface{}) rpcserver.Success {
 		Entity:  rtn,
 	}
 }
+
+func AttachCmd(ctx *cli.Context) error {
+	<-time.After(time.Second)
+	go func() {
+		defer close(Stop)
+		fmt.Println("------------")
+		fmt.Println("hello world")
+		fmt.Println("------------")
+		for {
+			fmt.Print("cmd #>")
+			ir := bufio.NewReader(os.Stdin)
+			if cmd, err := ir.ReadString('\n'); err == nil && strings.Trim(cmd, " ") != "\n" {
+				cmd = strings.Trim(cmd, " ")
+				cmd = cmd[:len([]byte(cmd))-1]
+				// TODO 用正则表达式拆分指令和参数
+				cmdArg := strings.Split(cmd, " ")
+				switch cmdArg[0] {
+				case "exit", "quit":
+					fmt.Println("bye bye ^_^ ")
+					return
+				default:
+					log.Println(cmd)
+					if fn, ok := Funcs[cmdArg[0]]; ok {
+						if r, err := fn(cmdArg[1:]...); err != nil {
+							log.Println(err)
+						} else if r != nil {
+							fmt.Println(r)
+						}
+					} else {
+						fmt.Println("not support : ", cmdArg[0])
+					}
+				}
+			}
+		}
+	}()
+	<-Stop
+	return nil
+}
+
+var (
+	apiurl  = func(port int) string { return fmt.Sprintf("http://localhost:%d/api/?body=", port) }
+	api_put = func(k, v string) string {
+		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"put","params":{"key":"%s","val":"%s"}}`, k, v)
+	}
+	api_get = func(k string) string {
+		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"get","params":{"key":"%s"}}`, k)
+	}
+	api_peers = func() string {
+		return apiurl(rpcport) + `{"service":"shell","method":"peers"}`
+	}
+
+	printResp = func(resp *http.Response) {
+		success := rpcserver.SuccessFromReader(resp.Body)
+		j, _ := json.Marshal(success)
+		var out bytes.Buffer
+		json.Indent(&out, j, "", "\t")
+		out.WriteTo(os.Stdout)
+		fmt.Println()
+	}
+	Funcs = map[string]cmdFn{
+		"put": func(args ...string) (interface{}, error) {
+			k, v := args[0], args[1]
+			resp, err := http.Get(api_put(k, v))
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+		"get": func(args ...string) (interface{}, error) {
+			k := args[0]
+			resp, err := http.Get(api_get(k))
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+		"peers": func(args ...string) (interface{}, error) {
+			resp, err := http.Get(api_peers())
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+	}
+)

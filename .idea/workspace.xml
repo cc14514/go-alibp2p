@@ -4,7 +4,6 @@
     <list default="true" id="e027093b-f9e0-4f2d-9f52-fe7b8cea8fb1" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/server.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -138,7 +137,8 @@
     <MESSAGE value="debug" />
     <MESSAGE value="networkid" />
     <MESSAGE value="rpcapi : echo" />
-    <option name="LAST_COMMIT_MESSAGE" value="rpcapi : echo" />
+    <MESSAGE value="增加 put/get api" />
+    <option name="LAST_COMMIT_MESSAGE" value="增加 put/get api" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>
