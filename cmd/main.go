@@ -285,6 +285,9 @@ var (
 	api_peers = func() string {
 		return apiurl(rpcport) + `{"service":"shell","method":"peers"}`
 	}
+	api_myid = func() string {
+		return apiurl(rpcport) + `{"service":"shell","method":"myid"}`
+	}
 
 	printResp = func(resp *http.Response) {
 		success := rpcserver.SuccessFromReader(resp.Body)
@@ -321,6 +324,17 @@ var (
 		},
 		"peers": func(args ...string) (interface{}, error) {
 			resp, err := http.Get(api_peers())
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+		"myid": func(args ...string) (interface{}, error) {
+			resp, err := http.Get(api_myid())
 			if err != nil {
 				log.Println("error", err)
 			}
