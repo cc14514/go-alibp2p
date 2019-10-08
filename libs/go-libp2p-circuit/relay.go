@@ -248,7 +248,7 @@ func (r *Relay) handleNewStream(s network.Stream) {
 		r.handleError(s, pb.CircuitRelay_MALFORMED_MESSAGE)
 		return
 	}
-	fmt.Println("--replay-->>", msg)
+	//fmt.Println("--replay-->>", msg)
 	switch msg.GetType() {
 	case pb.CircuitRelay_HOP:
 		r.handleHopStream(s, &msg)

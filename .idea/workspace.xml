@@ -2,14 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e027093b-f9e0-4f2d-9f52-fe7b8cea8fb1" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/config_test.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/libs/go-libp2p-circuit/relay.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p-circuit/relay.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/go-libp2p-kad-dht/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p-kad-dht/handlers.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/go-libp2p/p2p/host/basic/basic_host.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p/p2p/host/basic/basic_host.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/go-libp2p/p2p/protocol/identify/id.go" beforeDir="false" afterPath="$PROJECT_DIR$/libs/go-libp2p/p2p/protocol/identify/id.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/server.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -159,7 +152,8 @@
     <MESSAGE value="增加 attach" />
     <MESSAGE value="set default bootnode" />
     <MESSAGE value="myid" />
-    <option name="LAST_COMMIT_MESSAGE" value="myid" />
+    <MESSAGE value="功能调整，与日志清理" />
+    <option name="LAST_COMMIT_MESSAGE" value="功能调整，与日志清理" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>
