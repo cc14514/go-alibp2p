@@ -2,10 +2,20 @@
 
 >用 go-libp2p 实现的全联通 dht 网络，适合做 p2p 网络应用，如内容分享与区块链等，同时适合嵌入式环境，main 函数中提供了一些使用样例，如题如下
 
-## 参数说明
+## 编译
+
+```
+git clone https://github.com/cc14514/go-alibp2p.git
+cd go-alibp2p/cmd
+go build -o alibp2p main.go
+```
+
+## 启动节点
+
+* 参数
 
 ```bash
-$> go run cmd/main.go --help
+$> alibp2p --help
 NAME:
    /var/folders/b7/q0wwxn550x3_mkt1glwzv7rc0000gn/T/go-build982463937/b001/exe/main - 用来演示 go-alibp2p 的组网和通信功能
 
@@ -33,12 +43,39 @@ GLOBAL OPTIONS:
    --version, -v              print the version
 ```
 
+>使用默认参数启动节点，将会连接到我提供的测试网络中，可以在控制台看到一些 peer ，如果想建立私有网络，请使用自己的 networkid 和 bootnodes ，其中 bootnodes 应该是一个使用了 nodiscover 参数启动的节点，启动成功后日志中会有对应的 url 信息
+
+* 启动一个 bootnode 节点
+
+```bash
+$> alibp2p --nodiscover --networkid 2015061320170611
+localhost:cmd liangc$ go run main.go --nodiscover --networkid 2015061320170611
+2019/10/08 18:14:19 alibp2p.NewService {context.Background /tmp 10000 [] false 2015061320170611}
+2019/10/08 18:14:19 keypath /tmp/p2p.id
+2019/10/08 18:14:19 0 address /ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe
+2019/10/08 18:14:19 1 address /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe
+2019/10/08 18:14:19 New Service end =========>
+2019/10/08 18:14:19 >> Action on port = 0
+2019/10/08 18:14:19 <<<< service_reg_map >>>> : shell
+2019/10/08 18:14:19 StartDefaultServer port->8080 ; allow_method->[POST GET]
+2019/10/08 18:14:19 host = :8080
+```
+
+此时我们的 bootnode url 为 /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe
+
+* 启动跟随节点
+
+```bash
+$> alibp2p --networkid 2015061320170611 --bootnodes /ip4/10.0.0.76/tcp/10000/ipfs/16Uiu2HAmNx99xhp6wao2hq3EWDWjazqXQWPXJ2aEK3z5M55E9Phe 
+```
+
+
 ## 控制台
 
 >启动节点后，可以在本地 attach 到控制台进行功能调试
 
 ```bash
-$> go run cmd/main.go attach
+$> alibp2p attach
 ------------
 hello world
 ------------
