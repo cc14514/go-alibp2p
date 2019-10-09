@@ -28,6 +28,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 const (
@@ -36,7 +38,8 @@ const (
 )
 
 var (
-	defBootnodes = []string{
+	loopboot, loopbootstrap int32
+	defBootnodes            = []string{
 		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 	}
 
@@ -215,7 +218,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 
 func (self *Service) Start() {
 	if self.cfg.Discover {
-		self.Bootstrap()
+		self.bootstrap()
 	}
 }
 
@@ -250,21 +253,46 @@ func (self *Service) Get(k string) ([]byte, error) {
 	return self.router.GetValue(self.ctx, fmt.Sprintf("/%s/%s", NamespaceDHT, k))
 }
 
-func (self *Service) Bootstrap() error {
+func (self *Service) bootstrap() error {
 	log.Println("host-addrs", self.host.Addrs())
 	log.Println("host-network-listen", self.host.Network().ListenAddresses())
 	log.Println("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
-	err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
-	if err != nil {
-		panic(err)
-	}
-	// Bootstrap the host
-	err = self.router.Bootstrap(self.ctx)
-	if err != nil {
-		log.Println("bootstrap-error", "err", err)
-		panic(err)
-	}
-	return err
+	go func() {
+		log.Println("loopboot-start")
+		if atomic.CompareAndSwapInt32(&loopboot, 0, 1) {
+			defer func() {
+				atomic.StoreInt32(&loopboot, 0)
+				atomic.StoreInt32(&loopbootstrap, 0)
+			}()
+			for {
+				select {
+				case <-self.ctx.Done():
+					return
+				case <-time.After(5 * time.Second):
+					if len(self.host.Network().Conns()) < len(self.bootnodes) {
+						err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
+						if err == nil {
+							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
+								log.Println("Bootstrap the host")
+								err = self.router.Bootstrap(self.ctx)
+								if err != nil {
+									log.Println("bootstrap-error", "err", err)
+								}
+							} else {
+								log.Println("Reconnected and bootstrap the host once")
+								err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
+								if err != nil {
+									log.Println("bootstrap-error", "err", err)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		log.Println("loopboot-end")
+	}()
+	return nil
 }
 
 func convertPeers(peers []string) []peer.AddrInfo {

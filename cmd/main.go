@@ -19,7 +19,10 @@ import (
 	"time"
 )
 
-const echopid = "/echo/1.0.0"
+const (
+	version = "0.0.1-191009001"
+	echopid = "/echo/1.0.0"
+)
 
 var (
 	Stop                     = make(chan struct{})
@@ -46,7 +49,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = os.Args[0]
 	app.Usage = "用来演示 go-alibp2p 的组网和通信功能"
-	app.Version = "0.0.1"
+	app.Version = version
 	app.Author = "liangc"
 	app.Email = "cc14514@icloud.com"
 	app.Flags = []cli.Flag{
@@ -240,9 +243,11 @@ func (self *shellservice) Get(params interface{}) rpcserver.Success {
 }
 
 func (self *shellservice) Myid(params interface{}) rpcserver.Success {
+	entity := p2pservice.Myid()
+	entity["vsn"] = version
 	return rpcserver.Success{
 		Success: true,
-		Entity:  p2pservice.Myid(),
+		Entity:  entity,
 	}
 }
 
