@@ -12,8 +12,8 @@ github.com/btcsuite/goleveldb v0.0.0-20160330041536-7834afc9e8cd/go.mod h1:F+uVa
 github.com/btcsuite/snappy-go v0.0.0-20151229074030-0bdef8d06723/go.mod h1:8woku9dyThutzjeg+3xrA5iCpBRH8XEEg3lh6TiUghc=
 github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792/go.mod h1:ghJtEyQwv5/p4Mg4C0fgbePVuGr935/5ddU9Z3TmDRY=
 github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46fmI40EZs=
-github.com/cc14514/go-lightrpc v0.0.0-20191006124726-a77c695f8c82 h1:wn+Qxq4aEkB3hBQz++l0qovEZHxcpXLCH/fDkGY5me4=
-github.com/cc14514/go-lightrpc v0.0.0-20191006124726-a77c695f8c82/go.mod h1:jU5IztEXhp8V8Ytk7wVKI/pL65gPSVezAMlGIkjV0yM=
+github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb h1:PYDZEimAhi+3P3DZlRbkA7huAs5pOMxuFiQhHwvNR24=
+github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb/go.mod h1:SjXSLi/1N8zMq5T+WEF9kr4TOsh3LWm5fFqpObfk04c=
 github.com/cc14514/go-lightrpc v0.0.0-20191007114427-e1782b451d7b h1:3V1SSSG3Ocu1pEe2eJggIN2GRCKx7uXMRhlR9tUYkuo=
 github.com/cc14514/go-lightrpc v0.0.0-20191007114427-e1782b451d7b/go.mod h1:jU5IztEXhp8V8Ytk7wVKI/pL65gPSVezAMlGIkjV0yM=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
@@ -310,6 +310,8 @@ gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/fsnotify.v1 v1.4.7 h1:xOHLXZwVvI9hhs+cLKq5+I5onOuwQLhQwiu63xxlHs4=
 gopkg.in/fsnotify.v1 v1.4.7/go.mod h1:Tz8NjZHkW78fSQdbUxIjBTcgA1z1m8ZHf0WmKUhAMys=
+gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951 h1:DMTcQRFbEH62YPRWwOI647s2e5mHda3oBPMHfrLs2bw=
+gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951/go.mod h1:owOxCRGGeAx1uugABik6K9oeNu1cgxP/R9ItzLDxNWA=
 gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 h1:uRGJdciOHaEIrze2W8Q3AKkepLTh2hOroT7a+7czfdQ=
 gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7/go.mod h1:dt/ZhP58zS4L8KSrWDmTeBkI65Dw0HsyUHuEVlX15mw=
 gopkg.in/yaml.v2 v2.2.1 h1:mUhvW9EsL+naU5Q3cakzfE91YhliOondGd6ZrsDBHQE=

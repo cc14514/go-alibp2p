@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cc14514/go-alibp2p"
+	"github.com/cc14514/go-cookiekit/graph"
 	"github.com/cc14514/go-lightrpc/rpcserver"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/urfave/cli"
@@ -340,12 +341,13 @@ var (
 	Funcs = map[string]cmdFn{
 		"help": func(args ...string) (interface{}, error) {
 			fmt.Println("------------------------------")
-			fmt.Println("echo [id/url] [msg]")
-			fmt.Println("put [key] [val]")
-			fmt.Println("get [key]")
-			fmt.Println("findpeer [id]")
-			fmt.Println("peers")
-			fmt.Println("myid")
+			fmt.Println("echo [id/url] [msg]\t如果对方在线会原文返回")
+			fmt.Println("put [key] [val]\t在 dht 上存放一个 key / val 对")
+			fmt.Println("get [key]\t在 dht 上获取 key 对应的 val")
+			fmt.Println("findpeer [id]\t全网寻找一个在线的peer")
+			fmt.Println("peers\t连接的peer")
+			fmt.Println("relaygraph\t中继节点关系图的临接表")
+			fmt.Println("myid\t我的节点信息")
 			fmt.Println("help , exit , quit")
 			fmt.Println("------------------------------")
 			return nil, nil
@@ -420,5 +422,80 @@ var (
 			printResp(resp)
 			return nil, nil
 		},
+		"relaygraph": func(args ...string) (interface{}, error) {
+			resp, err := http.Get(api_peers())
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			success := rpcserver.SuccessFromReader(resp.Body)
+			peers := success.Entity.(map[string]interface{})
+			data0, ok := peers["Direct"]
+			if !ok {
+				return nil, nil
+			}
+			data1, ok := peers["Relay"]
+			if !ok {
+				return nil, nil
+			}
+
+			vi := 0
+			vmap_i := make(map[int]string)
+			vmap_n := make(map[string]int)
+
+			list0 := data0.([]interface{})
+			for _, p := range list0 {
+				s := p.(string)
+				arr := strings.Split(s, "/ipfs/")
+				t := arr[1]
+				vmap_i[vi] = t
+				vmap_n[t] = vi
+				vi = vi + 1
+			}
+
+			edges := make(map[string]string)
+			list1 := data1.([]interface{})
+			for _, p := range list1 {
+				s := p.(string)
+				arr := strings.Split(s, "/p2p-circuit")
+				f, t := arr[0][6:], arr[1][6:]
+				edges[t] = f
+				vmap_i[vi] = t
+				vmap_n[t] = vi
+				vi = vi + 1
+			}
+
+			graph := graph.NewGraph(len(list0) + len(list1))
+
+			for t, f := range edges {
+				v := vmap_n[t]
+				w := vmap_n[f]
+				graph.AddEdge(v, w)
+			}
+
+			printAdj(graph, vmap_i)
+
+			return nil, nil
+		},
 	}
 )
+
+func printAdj(g *graph.Graph, m map[int]string) {
+	adj := g.GetAdj()
+	rm := make(map[string]interface{})
+	for v, bag := range adj {
+		sb := make([]string, 0)
+		bag.Items(func(i interface{}) {
+			_v := i.(int)
+			sb = append(sb, m[_v])
+		})
+		rm[m[v]] = sb
+	}
+	j, _ := json.Marshal(rm)
+	var out bytes.Buffer
+	json.Indent(&out, j, "", "\t")
+	out.WriteTo(os.Stdout)
+	fmt.Println()
+}
