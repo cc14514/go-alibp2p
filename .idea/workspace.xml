@@ -13,6 +13,9 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FavoritesManager">
+    <favorites_list name="go-alibp2p" />
+  </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
@@ -148,7 +151,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="debug" />
     <MESSAGE value="networkid" />
     <MESSAGE value="rpcapi : echo" />
     <MESSAGE value="增加 put/get api" />
@@ -160,7 +162,8 @@
     <MESSAGE value="增加 log" />
     <MESSAGE value="readme" />
     <MESSAGE value="修正 bootstrap 逻辑" />
-    <option name="LAST_COMMIT_MESSAGE" value="修正 bootstrap 逻辑" />
+    <MESSAGE value="debug" />
+    <option name="LAST_COMMIT_MESSAGE" value="debug" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>

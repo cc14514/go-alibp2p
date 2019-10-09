@@ -176,9 +176,7 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 //http://localhost:8081/api/?body={"service":"shell","method":"echo","params":{"to":"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP","msg":"hello world"}}
 func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	s := time.Now()
-	log.Println("echo_params=", params)
 	args := params.(map[string]interface{})
-	log.Println("echo_args=", args)
 	to := args["to"].(string)
 	msg := args["msg"].(string)
 	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
@@ -204,9 +202,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 
 func (self *shellservice) Put(params interface{}) rpcserver.Success {
 	s := time.Now()
-	log.Println("put_params=", params)
 	args := params.(map[string]interface{})
-	log.Println("put_args=", args)
 	k := args["key"].(string)
 	v := args["val"].(string)
 	success := true
@@ -224,9 +220,7 @@ func (self *shellservice) Put(params interface{}) rpcserver.Success {
 
 func (self *shellservice) Get(params interface{}) rpcserver.Success {
 	s := time.Now()
-	log.Println("get_params=", params)
 	args := params.(map[string]interface{})
-	log.Println("get_args=", args)
 	k := args["key"].(string)
 	success := true
 	rtn := ""
