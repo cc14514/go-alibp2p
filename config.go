@@ -9,18 +9,21 @@ import (
 	"github.com/libp2p/go-libp2p"
 	apnet "github.com/libp2p/go-libp2p-pnet"
 	"strings"
+	"github.com/libp2p/go-libp2p-core/crypto"
+
 
 	"math/big"
 )
 
 type Config struct {
 	//ctx context.Context, homedir string, port int, bootnodes []string
-	Ctx       context.Context
-	Homedir   string
-	Port      uint64
-	Bootnodes []string
-	Discover  bool
-	Networkid *big.Int
+	Ctx        context.Context
+	Homedir    string
+	Port       uint64
+	Bootnodes  []string
+	Discover   bool
+	Networkid  *big.Int
+	PrivKey crypto.PrivKey
 }
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {

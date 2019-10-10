@@ -97,10 +97,16 @@ func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil 
 
 func NewService(cfg Config) *Service {
 	log.Println("alibp2p.NewService", cfg)
-	priv, err := loadid(cfg.Homedir)
+	var (
+		err    error
+		router routing.Routing
+		priv   = cfg.PrivKey
+	)
+	if priv == nil {
+		priv, err = loadid(cfg.Homedir)
+	}
 	//hid, _ := peer.IDFromPublicKey(priv.GetPublic())
 	//relayaddr, err := ma.NewMultiaddr("/p2p-circuit/ipfs/" + h3.ID().Pretty())
-	var router routing.Routing
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
 	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
 
