@@ -25,3 +25,7 @@ func TestID(t *testing.T) {
 	b := atomic.CompareAndSwapInt32(&i, 0, 5)
 	t.Log(b, i)
 }
+
+func TestByte(t *testing.T) {
+	t.Log([]byte("ping"))
+}

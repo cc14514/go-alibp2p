@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
+	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -21,9 +22,13 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
+	msmux "github.com/multiformats/go-multistream"
+
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -88,9 +93,22 @@ type (
 		router    routing.Routing
 		bootnodes []peer.AddrInfo
 		cfg       Config
+		notifiee  *network.NotifyBundle
 	}
 	blankValidator struct{}
+
+	SConn struct {
+		network.Stream
+	}
 )
+
+func (S SConn) LocalAddr() net.Addr {
+	return S.LocalAddr()
+}
+
+func (S SConn) RemoteAddr() net.Addr {
+	return S.RemoteAddr()
+}
 
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
 func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
@@ -100,9 +118,12 @@ func NewService(cfg Config) *Service {
 	var (
 		err    error
 		router routing.Routing
-		priv   = cfg.PrivKey
+		priv   crypto.PrivKey
 	)
-	if priv == nil {
+	if cfg.PrivKey != nil {
+		_p := (*crypto.Secp256k1PrivateKey)(cfg.PrivKey)
+		priv = (crypto.PrivKey)(_p)
+	} else {
 		priv, err = loadid(cfg.Homedir)
 	}
 	//hid, _ := peer.IDFromPublicKey(priv.GetPublic())
@@ -132,6 +153,7 @@ func NewService(cfg Config) *Service {
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
 	}
+	optlist = append(optlist, libp2p.ConnectionManager(connmgr.NewConnManager(600, 900, time.Second*20)))
 
 	host, err := libp2p.New(cfg.Ctx, optlist...)
 
@@ -158,6 +180,7 @@ func NewService(cfg Config) *Service {
 		host:      host,
 		router:    router,
 		bootnodes: bootpeers,
+		notifiee:  new(network.NotifyBundle),
 	}
 }
 
@@ -172,6 +195,28 @@ func (self *Service) Myid() map[string]interface{} {
 	}
 }
 
+func (self *Service) GetConn(pid string) chan SConn {
+	connCh := make(chan SConn)
+	self.host.Mux().AddHandler(pid, func(p string, rwc io.ReadWriteCloser) error {
+		is := rwc.(network.Stream)
+		is.SetProtocol(protocol.ID(p))
+		fmt.Println("func (self *Service) GetConn(pid string) chan SConn 11111")
+		connCh <- SConn{Stream: is}
+		fmt.Println("func (self *Service) GetConn(pid string) chan SConn 22222")
+		return nil
+	})
+	return connCh
+}
+
+func (self *Service) SetHandler(pid string, handler func(peerid string, rw io.ReadWriter) error) {
+	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
+		if err := handler(s.Conn().RemotePeer().Pretty(), s); err != nil {
+			log.Println(err)
+			s.Reset()
+		}
+	})
+}
+
 func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)) {
 	self.host.SetStreamHandler(protocol.ID(pid), handler)
 }
@@ -181,18 +226,18 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 			return nil, err
 		}
 
 		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 			return nil, err
 		}
 		peerid, err = peer.IDB58Decode(pid)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 			return nil, err
 		}
 		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
@@ -203,26 +248,75 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	} else {
 		pi, err := self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 			return nil, err
 		}
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	}
 
 	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
+	defer func() {
+		if err != nil && s != nil {
+			s.Reset()
+		} else if s != nil {
+			s.Close()
+		}
+	}()
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		return nil, err
 	}
 	_, err = s.Write(msg)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		return nil, err
 	}
 	return s, err
 }
 
+func (self *Service) OnConnected(ctx context.Context, protoid string, callback func(pubKey *ecdsa.PublicKey, fd net.Conn)) {
+	self.host.Network().SetConnHandler(func(conn network.Conn) {
+		connCh := self.GetConn(protoid)
+		pk, err := conn.RemotePeer().ExtractPublicKey()
+		if err != nil {
+			fmt.Println("---- Error 1--->", err)
+			return
+		}
+		k0 := pk.(*crypto.Secp256k1PublicKey)
+		pubkey := (*ecdsa.PublicKey)(k0)
+
+		sconn, err := conn.NewStream()
+		fmt.Println("---- Error 2--->", err)
+		sconn.SetProtocol(protocol.ID(protoid))
+		// ok give the response to our handler.
+		if err := msmux.SelectProtoOrFail(protoid, sconn); err != nil {
+			fmt.Println("---- Error 3--->", err)
+			sconn.Reset()
+			return
+		}
+
+		sconn.Write([]byte("open"))
+		fd := <-connCh
+		callback(pubkey, fd)
+	})
+}
+
+func (self *Service) OnDisconnected(callback func(pubKey *ecdsa.PublicKey)) {
+	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
+		pk, err := conn.RemotePeer().ExtractPublicKey()
+		if err != nil {
+			fmt.Println("---- Error --->", err)
+			fmt.Println(err)
+			return
+		}
+		k0 := pk.(*crypto.Secp256k1PublicKey)
+		pubkey := (*ecdsa.PublicKey)(k0)
+		callback(pubkey)
+	}
+}
+
 func (self *Service) Start() {
+	self.host.Network().Notify(self.notifiee)
 	if self.cfg.Discover {
 		self.bootstrap()
 	}
@@ -241,6 +335,22 @@ func (self *Service) Peers() (direct []string, relay []string) {
 		}
 	}
 	return direct, relay
+}
+
+func (self *Service) PutPeerMeta(id, key string, v interface{}) error {
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return err
+	}
+	return self.host.Peerstore().Put(p, key, v)
+}
+
+func (self *Service) GetPeerMeta(id, key string) (interface{}, error) {
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return nil, err
+	}
+	return self.host.Peerstore().Get(p, key)
 }
 
 func (self *Service) Findpeer(id string) (peer.AddrInfo, error) {
@@ -307,7 +417,7 @@ func convertPeers(peers []string) []peer.AddrInfo {
 		maddr := ma.StringCast(addr)
 		p, err := peer.AddrInfoFromP2pAddr(maddr)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 		}
 		pinfos[i] = *p
 	}
