@@ -378,11 +378,12 @@ func (self *Service) Conns() (direct []string, relay []string) {
 	return direct, relay
 }
 
-func (self *Service) Peers() (direct []string, relay map[string][]string) {
-	direct, relay = make([]string, 0), make(map[string][]string)
+func (self *Service) Peers() (direct []string, relay map[string][]string, total int) {
+	direct, relay, total = make([]string, 0), make(map[string][]string), 0
 	dl, rl := self.Conns()
 	for _, d := range dl {
 		direct = append(direct, strings.Split(d, "/ipfs/")[1])
+		total += 1
 	}
 	for _, r := range rl {
 		arr := strings.Split(r, "/p2p-circuit")
@@ -394,8 +395,9 @@ func (self *Service) Peers() (direct []string, relay map[string][]string) {
 		}
 		rarr = append(rarr, strings.Split(t, "/ipfs/")[1])
 		relay[strings.Split(f, "/ipfs/")[1]] = rarr
+		total += 1
 	}
-	return direct, relay
+	return direct, relay, total
 }
 
 func (self *Service) PutPeerMeta(id, key string, v interface{}) error {

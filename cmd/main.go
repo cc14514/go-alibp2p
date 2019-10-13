@@ -217,7 +217,7 @@ type (
 //http://localhost:8081/api/?body={"service":"shell","method":"peers"}
 func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 	s := time.Now()
-	direct, relay := p2pservice.Peers()
+	direct, relay, total := p2pservice.Peers()
 	return rpcserver.Success{
 		Success: true,
 		Entity: struct {
@@ -225,7 +225,7 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 			Total    int
 			Direct   []string
 			Relay    map[string][]string
-		}{time.Since(s).String(), len(direct) + len(relay), direct, relay},
+		}{time.Since(s).String(), total, direct, relay},
 	}
 }
 
