@@ -6,21 +6,22 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/cc14514/go-alibp2p"
 	"github.com/cc14514/go-cookiekit/graph"
 	"github.com/cc14514/go-lightrpc/rpcserver"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
-	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ const (
 	version = "0.0.1-191009001"
 	echopid = "/echo/1.0.0"
 	pingpid = "/ping/1.0.0"
+	msgpid  = "/msg/1.0.0"
 )
 
 var (
@@ -123,75 +125,23 @@ func main() {
 			cfg.Bootnodes = strings.Split(bootnodes, ",")
 		}
 		p2pservice = alibp2p.NewService(cfg)
-
-		p2pservice.OnDisconnected(func(pubKey *ecdsa.PublicKey) {
-			fmt.Println("Disconnected-callback", pubKey)
+		watchpeer()
+		p2pservice.SetHandler(pingpid, func(peer string, rw io.ReadWriter) error {
+			log.Println("ping msg from", peer)
+			buf := make([]byte, 4)
+			t, err := rw.Read(buf)
+			if err != nil {
+				return err
+			}
+			if bytes.Equal(buf[:t], []byte("ping")) {
+				rw.Write([]byte("pong"))
+			} else {
+				err = errors.New("error_msg")
+				rw.Write([]byte(err.Error()))
+				return err
+			}
+			return nil
 		})
-
-		p2pservice.OnConnected(cfg.Ctx, pingpid, func(pubKey *ecdsa.PublicKey, fd net.Conn) {
-			k0 := (*crypto.Secp256k1PublicKey)(pubKey)
-			k1 := (crypto.PubKey)(k0)
-			id, _ := peer.IDFromPublicKey(k1)
-
-			go func() {
-				buf := make([]byte, 512)
-				for {
-					t, err := fd.Read(buf)
-					if err != nil {
-						fmt.Println("ffffff error", err)
-						return
-					}
-					fmt.Println("fffffff ---> ", t, string(buf[:t]))
-				}
-			}()
-
-			go func() {
-				for {
-					t, err := fd.Write([]byte("ping"))
-					if err != nil {
-						fmt.Println("eeeeee error", err)
-						return
-					}
-					fmt.Println("eeeeee ---> ", t)
-					<-time.After(2 * time.Second)
-				}
-			}()
-
-			fmt.Println("OnConnected-callback", id.Pretty())
-		})
-
-		/*		p2pservice.SetHandler(pingpid, func(peer string, rw io.ReadWriter) error {
-					fmt.Println("==> ping ", peer)
-					go func() {
-						buf := make([]byte, 512)
-						for {
-							t, err := rw.Read(buf)
-							if err != nil {
-								fmt.Println("ggggggg error", err)
-								return
-							}
-							fmt.Println("ggggggg ---> ", t, string(buf[:t]))
-						}
-					}()
-					return nil
-				})
-		*/
-		/*		p2pservice.SetHandler(pingpid, func(peer string, rw io.ReadWriter) error {
-				log.Println("ping msg from", peer)
-				buf := make([]byte, 4)
-				t, err := rw.Read(buf)
-				if err != nil {
-					return err
-				}
-				if bytes.Equal(buf[:t], []byte("ping")) {
-					rw.Write([]byte("pong"))
-				} else {
-					err = errors.New("error_msg")
-					rw.Write([]byte(err.Error()))
-					return err
-				}
-				return nil
-			})*/
 
 		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
 			from := s.Conn().RemotePeer()
@@ -225,6 +175,36 @@ func main() {
 	app.Run(os.Args)
 }
 
+var (
+	peermap = new(sync.Map)
+)
+
+func watchpeer() {
+
+	p2pservice.OnConnected(func(pubKey *ecdsa.PublicKey) {
+		k, _ := alibp2p.ECDSAPubEncode(pubKey)
+		peermap.Store(k, time.Now())
+	})
+
+	p2pservice.OnDisconnected(func(pubKey *ecdsa.PublicKey) {
+		k, _ := alibp2p.ECDSAPubEncode(pubKey)
+		peermap.Delete(k)
+	})
+
+	go func() {
+		for {
+			<-time.After(3 * time.Second)
+			i := 0
+			peermap.Range(func(key, value interface{}) bool {
+				i += 1
+				return true
+			})
+			fmt.Println("=====> ", i)
+		}
+	}()
+
+}
+
 type (
 	shellservice struct{}
 	apiret       struct {
@@ -244,7 +224,7 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 			TimeUsed string
 			Total    int
 			Direct   []string
-			Relay    []string
+			Relay    map[string][]string
 		}{time.Since(s).String(), len(direct) + len(relay), direct, relay},
 	}
 }
@@ -392,6 +372,13 @@ func (self *shellservice) Ping(params interface{}) rpcserver.Success {
 }
 
 func AttachCmd(ctx *cli.Context) error {
+	fmt.Println(len(os.Args), os.Args)
+	if len(os.Args) == 3 {
+		rp, err := strconv.Atoi(os.Args[2])
+		if err == nil {
+			rpcport = rp
+		}
+	}
 	<-time.After(time.Second)
 	go func() {
 		defer close(Stop)

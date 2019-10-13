@@ -22,13 +22,10 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
-	msmux "github.com/multiformats/go-multistream"
-
 	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
-	"net"
 	"os"
 	"path"
 	"strings"
@@ -83,6 +80,87 @@ var (
 		priv3 := (crypto.PrivKey)(priv2)
 		return priv3, err
 	}
+
+	bootstrapConnect = func(ctx context.Context, ph host.Host, peers []peer.AddrInfo) error {
+		if len(peers) < 1 {
+			return errors.New("not enough bootstrap peers")
+		}
+
+		errs := make(chan error, len(peers))
+		var wg sync.WaitGroup
+		for _, p := range peers {
+			if ph.ID() == p.ID {
+				continue
+			}
+			wg.Add(1)
+			go func(p peer.AddrInfo) {
+				defer wg.Done()
+				defer log.Println(ctx, "bootstrapDial", ph.ID(), p.ID)
+				log.Printf("%s bootstrapping to %s : %v", ph.ID(), p.ID, p.Addrs)
+				ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
+				if err := ph.Connect(ctx, p); err != nil {
+					log.Println(ctx, "bootstrapDialFailed", p.ID)
+					log.Printf("failed to bootstrap with %v: %s", p.ID, err)
+					errs <- err
+					return
+				}
+				log.Println(ctx, "bootstrapDialSuccess", p.ID, ph.Peerstore().PeerInfo(p.ID))
+				log.Printf("bootstrapped with %v", p.ID)
+			}(p)
+		}
+		wg.Wait()
+		close(errs)
+		count := 0
+		var err error
+		for err = range errs {
+			if err != nil {
+				count++
+			}
+		}
+		if count == len(peers) {
+			return fmt.Errorf("failed to bootstrap. %s", err)
+		}
+		return nil
+	}
+
+	convertPeers = func(peers []string) []peer.AddrInfo {
+		pinfos := make([]peer.AddrInfo, len(peers))
+		for i, addr := range peers {
+			maddr := ma.StringCast(addr)
+			p, err := peer.AddrInfoFromP2pAddr(maddr)
+			if err != nil {
+				log.Println(err)
+			}
+			pinfos[i] = *p
+		}
+		return pinfos
+	}
+
+	pubkeyToEcdsa = func(pk crypto.PubKey) *ecdsa.PublicKey {
+		k0 := pk.(*crypto.Secp256k1PublicKey)
+		pubkey := (*ecdsa.PublicKey)(k0)
+		return pubkey
+	}
+	ecdsaToPubkey = func(pk *ecdsa.PublicKey) crypto.PubKey {
+		k0 := (*crypto.Secp256k1PublicKey)(pk)
+		return k0
+	}
+
+	ECDSAPubEncode = func(pk *ecdsa.PublicKey) (string, error) {
+		id, err := peer.IDFromPublicKey(ecdsaToPubkey(pk))
+		return id.Pretty(), err
+	}
+	ECDSAPubDecode = func(pk string) (*ecdsa.PublicKey, error) {
+		id, err := peer.IDB58Decode(pk)
+		if err != nil {
+			return nil, err
+		}
+		pub, err := id.ExtractPublicKey()
+		if err != nil {
+			return nil, err
+		}
+		return pubkeyToEcdsa(pub), nil
+	}
 )
 
 type (
@@ -96,19 +174,7 @@ type (
 		notifiee  *network.NotifyBundle
 	}
 	blankValidator struct{}
-
-	SConn struct {
-		network.Stream
-	}
 )
-
-func (S SConn) LocalAddr() net.Addr {
-	return S.LocalAddr()
-}
-
-func (S SConn) RemoteAddr() net.Addr {
-	return S.RemoteAddr()
-}
 
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
 func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
@@ -195,6 +261,7 @@ func (self *Service) Myid() map[string]interface{} {
 	}
 }
 
+/*
 func (self *Service) GetConn(pid string) chan SConn {
 	connCh := make(chan SConn)
 	self.host.Mux().AddHandler(pid, func(p string, rwc io.ReadWriteCloser) error {
@@ -207,6 +274,7 @@ func (self *Service) GetConn(pid string) chan SConn {
 	})
 	return connCh
 }
+*/
 
 func (self *Service) SetHandler(pid string, handler func(peerid string, rw io.ReadWriter) error) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
@@ -217,8 +285,8 @@ func (self *Service) SetHandler(pid string, handler func(peerid string, rw io.Re
 	})
 }
 
-func (self *Service) SetStreamHandler(pid string, handler func(s network.Stream)) {
-	self.host.SetStreamHandler(protocol.ID(pid), handler)
+func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {
+	self.host.SetStreamHandler(protocol.ID(protoid), handler)
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream, error) {
@@ -274,44 +342,17 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	return s, err
 }
 
-func (self *Service) OnConnected(ctx context.Context, protoid string, callback func(pubKey *ecdsa.PublicKey, fd net.Conn)) {
-	self.host.Network().SetConnHandler(func(conn network.Conn) {
-		connCh := self.GetConn(protoid)
-		pk, err := conn.RemotePeer().ExtractPublicKey()
-		if err != nil {
-			fmt.Println("---- Error 1--->", err)
-			return
-		}
-		k0 := pk.(*crypto.Secp256k1PublicKey)
-		pubkey := (*ecdsa.PublicKey)(k0)
-
-		sconn, err := conn.NewStream()
-		fmt.Println("---- Error 2--->", err)
-		sconn.SetProtocol(protocol.ID(protoid))
-		// ok give the response to our handler.
-		if err := msmux.SelectProtoOrFail(protoid, sconn); err != nil {
-			fmt.Println("---- Error 3--->", err)
-			sconn.Reset()
-			return
-		}
-
-		sconn.Write([]byte("open"))
-		fd := <-connCh
-		callback(pubkey, fd)
-	})
+func (self *Service) OnConnected(callback func(pubKey *ecdsa.PublicKey)) {
+	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
+		pk, _ := conn.RemotePeer().ExtractPublicKey()
+		callback(pubkeyToEcdsa(pk))
+	}
 }
 
 func (self *Service) OnDisconnected(callback func(pubKey *ecdsa.PublicKey)) {
 	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
-		pk, err := conn.RemotePeer().ExtractPublicKey()
-		if err != nil {
-			fmt.Println("---- Error --->", err)
-			fmt.Println(err)
-			return
-		}
-		k0 := pk.(*crypto.Secp256k1PublicKey)
-		pubkey := (*ecdsa.PublicKey)(k0)
-		callback(pubkey)
+		pk, _ := conn.RemotePeer().ExtractPublicKey()
+		callback(pubkeyToEcdsa(pk))
 	}
 }
 
@@ -322,7 +363,7 @@ func (self *Service) Start() {
 	}
 }
 
-func (self *Service) Peers() (direct []string, relay []string) {
+func (self *Service) Conns() (direct []string, relay []string) {
 	direct, relay = make([]string, 0), make([]string, 0)
 	for _, c := range self.host.Network().Conns() {
 		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
@@ -333,6 +374,26 @@ func (self *Service) Peers() (direct []string, relay []string) {
 		} else {
 			direct = append(direct, string(taddr))
 		}
+	}
+	return direct, relay
+}
+
+func (self *Service) Peers() (direct []string, relay map[string][]string) {
+	direct, relay = make([]string, 0), make(map[string][]string)
+	dl, rl := self.Conns()
+	for _, d := range dl {
+		direct = append(direct, strings.Split(d, "/ipfs/")[1])
+	}
+	for _, r := range rl {
+		arr := strings.Split(r, "/p2p-circuit")
+		f, t := arr[0], arr[1]
+
+		rarr, ok := relay[strings.Split(f, "/ipfs/")[1]]
+		if !ok {
+			rarr = make([]string, 0)
+		}
+		rarr = append(rarr, strings.Split(t, "/ipfs/")[1])
+		relay[strings.Split(f, "/ipfs/")[1]] = rarr
 	}
 	return direct, relay
 }
@@ -408,61 +469,5 @@ func (self *Service) bootstrap() error {
 		}
 		log.Println("loopboot-end")
 	}()
-	return nil
-}
-
-func convertPeers(peers []string) []peer.AddrInfo {
-	pinfos := make([]peer.AddrInfo, len(peers))
-	for i, addr := range peers {
-		maddr := ma.StringCast(addr)
-		p, err := peer.AddrInfoFromP2pAddr(maddr)
-		if err != nil {
-			log.Println(err)
-		}
-		pinfos[i] = *p
-	}
-	return pinfos
-}
-
-// This code is borrowed from the go-ipfs bootstrap process
-func bootstrapConnect(ctx context.Context, ph host.Host, peers []peer.AddrInfo) error {
-	if len(peers) < 1 {
-		return errors.New("not enough bootstrap peers")
-	}
-
-	errs := make(chan error, len(peers))
-	var wg sync.WaitGroup
-	for _, p := range peers {
-		if ph.ID() == p.ID {
-			continue
-		}
-		wg.Add(1)
-		go func(p peer.AddrInfo) {
-			defer wg.Done()
-			defer log.Println(ctx, "bootstrapDial", ph.ID(), p.ID)
-			log.Printf("%s bootstrapping to %s : %v", ph.ID(), p.ID, p.Addrs)
-			ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
-			if err := ph.Connect(ctx, p); err != nil {
-				log.Println(ctx, "bootstrapDialFailed", p.ID)
-				log.Printf("failed to bootstrap with %v: %s", p.ID, err)
-				errs <- err
-				return
-			}
-			log.Println(ctx, "bootstrapDialSuccess", p.ID, ph.Peerstore().PeerInfo(p.ID))
-			log.Printf("bootstrapped with %v", p.ID)
-		}(p)
-	}
-	wg.Wait()
-	close(errs)
-	count := 0
-	var err error
-	for err = range errs {
-		if err != nil {
-			count++
-		}
-	}
-	if count == len(peers) {
-		return fmt.Errorf("failed to bootstrap. %s", err)
-	}
 	return nil
 }
