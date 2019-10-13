@@ -2,7 +2,9 @@ package alibp2p
 
 import (
 	"crypto/sha256"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
+	"sync/atomic"
 	"testing"
 )
 
@@ -13,4 +15,17 @@ func TestPSK(t *testing.T) {
 	h := s.Sum(nil)
 	t.Log(n.Bytes())
 	t.Log(len(h), h)
+}
+
+func TestID(t *testing.T) {
+	peerid, err := peer.IDB58Decode("16Uiu2HAmFPq2Tt2TRqAttQHmKiQRcKZ8THmtmQsawAHz84WsHjNr")
+	t.Log(err, peerid)
+	i := int32(0)
+
+	b := atomic.CompareAndSwapInt32(&i, 0, 5)
+	t.Log(b, i)
+}
+
+func TestByte(t *testing.T) {
+	t.Log([]byte("ping"))
 }

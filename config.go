@@ -2,6 +2,7 @@ package alibp2p
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -10,7 +11,6 @@ import (
 	apnet "github.com/libp2p/go-libp2p-pnet"
 	"strings"
 
-	"log"
 	"math/big"
 )
 
@@ -22,6 +22,7 @@ type Config struct {
 	Bootnodes []string
 	Discover  bool
 	Networkid *big.Int
+	PrivKey   *ecdsa.PrivateKey
 }
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
@@ -33,7 +34,6 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 /base16/
 %s`
 		key := fmt.Sprintf(tmp, hex.EncodeToString(k))
-		log.Println("privatenet_id=", key)
 		r := strings.NewReader(key)
 		p, err := apnet.NewProtector(r)
 		if err != nil {
