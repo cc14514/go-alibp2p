@@ -82,6 +82,8 @@ github.com/libp2p/go-libp2p-autonat/pb
 # github.com/libp2p/go-libp2p-circuit v0.1.0 => ./libs/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
+# github.com/libp2p/go-libp2p-connmgr v0.1.0
+github.com/libp2p/go-libp2p-connmgr
 # github.com/libp2p/go-libp2p-core v0.0.1
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/crypto

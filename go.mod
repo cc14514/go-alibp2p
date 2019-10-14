@@ -11,7 +11,6 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.1.0
 	github.com/libp2p/go-libp2p-pnet v0.1.0
 	github.com/multiformats/go-multiaddr v0.0.4
-	github.com/multiformats/go-multistream v0.1.0
 	github.com/urfave/cli v1.22.1
 	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951 // indirect
 )
