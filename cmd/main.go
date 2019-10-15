@@ -116,7 +116,7 @@ func main() {
 			Ctx:       context.Background(),
 			Homedir:   homedir,
 			Port:      uint64(port),
-			Bootnodes: nil,
+			Bootnodes: defBootnodes,
 			Discover:  !nodiscover,
 			Networkid: big.NewInt(int64(networkid)),
 		}
@@ -126,8 +126,8 @@ func main() {
 		}
 		p2pservice = alibp2p.NewService(cfg)
 		watchpeer()
-		p2pservice.SetHandler(pingpid, func(peer string, rw io.ReadWriter) error {
-			log.Println("ping msg from", peer)
+		p2pservice.SetHandler(pingpid, func(session string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error {
+			log.Println("ping msg from", pubkey, session)
 			buf := make([]byte, 4)
 			t, err := rw.Read(buf)
 			if err != nil {
@@ -177,18 +177,24 @@ func main() {
 
 var (
 	peermap = new(sync.Map)
+	// only for testnet
+	defBootnodes = []string{
+		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
+	}
 )
 
 func watchpeer() {
 
-	p2pservice.OnConnected(func(pubKey *ecdsa.PublicKey) {
+	p2pservice.OnConnected(func(inbound bool, session string, pubKey *ecdsa.PublicKey) {
 		k, _ := alibp2p.ECDSAPubEncode(pubKey)
 		peermap.Store(k, time.Now())
+		fmt.Println("OnConnected >", k, session)
 	})
 
-	p2pservice.OnDisconnected(func(pubKey *ecdsa.PublicKey) {
+	p2pservice.OnDisconnected(func(session string, pubKey *ecdsa.PublicKey) {
 		k, _ := alibp2p.ECDSAPubEncode(pubKey)
 		peermap.Delete(k)
+		fmt.Println("OnDisconnected >", k, session)
 	})
 
 	go func() {
@@ -199,7 +205,7 @@ func watchpeer() {
 				i += 1
 				return true
 			})
-			fmt.Println("=====> ", i)
+			//fmt.Println("=====> ", i)
 		}
 	}()
 

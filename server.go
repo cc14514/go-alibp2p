@@ -41,9 +41,6 @@ const (
 
 var (
 	loopboot, loopbootstrap int32
-	defBootnodes            = []string{
-		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
-	}
 
 	DefaultProtocols = []protocol.ID{ProtocolDHT}
 	curve            = btcec.S256()
@@ -123,17 +120,18 @@ var (
 		return nil
 	}
 
-	convertPeers = func(peers []string) []peer.AddrInfo {
+	convertPeers = func(peers []string) ([]peer.AddrInfo, error) {
 		pinfos := make([]peer.AddrInfo, len(peers))
 		for i, addr := range peers {
 			maddr := ma.StringCast(addr)
 			p, err := peer.AddrInfoFromP2pAddr(maddr)
 			if err != nil {
 				log.Println(err)
+				return nil, err
 			}
 			pinfos[i] = *p
 		}
-		return pinfos
+		return pinfos, nil
 	}
 
 	pubkeyToEcdsa = func(pk crypto.PubKey) *ecdsa.PublicKey {
@@ -182,9 +180,10 @@ func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil 
 func NewService(cfg Config) *Service {
 	log.Println("alibp2p.NewService", cfg)
 	var (
-		err    error
-		router routing.Routing
-		priv   crypto.PrivKey
+		err       error
+		router    routing.Routing
+		priv      crypto.PrivKey
+		bootnodes []peer.AddrInfo
 	)
 	if cfg.PrivKey != nil {
 		_p := (*crypto.Secp256k1PrivateKey)(cfg.PrivKey)
@@ -233,9 +232,11 @@ func NewService(cfg Config) *Service {
 		log.Println(i, "address", full)
 	}
 
-	bootpeers := convertPeers(defBootnodes)
 	if cfg.Bootnodes != nil && len(cfg.Bootnodes) > 0 {
-		bootpeers = convertPeers(cfg.Bootnodes)
+		bootnodes, err = convertPeers(cfg.Bootnodes)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	log.Println("New Service end =========>")
@@ -245,9 +246,15 @@ func NewService(cfg Config) *Service {
 		homedir:   cfg.Homedir,
 		host:      host,
 		router:    router,
-		bootnodes: bootpeers,
+		bootnodes: bootnodes,
 		notifiee:  new(network.NotifyBundle),
 	}
+}
+
+func (self *Service) SetBootnode(peer ...string) error {
+	pi, err := convertPeers(peer)
+	self.bootnodes = pi
+	return err
 }
 
 func (self *Service) Myid() map[string]interface{} {
@@ -276,9 +283,13 @@ func (self *Service) GetConn(pid string) chan SConn {
 }
 */
 
-func (self *Service) SetHandler(pid string, handler func(peerid string, rw io.ReadWriter) error) {
+func (self *Service) SetHandler(pid string, handler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
-		if err := handler(s.Conn().RemotePeer().Pretty(), s); err != nil {
+		conn := s.Conn()
+		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+		pk, _ := s.Conn().RemotePeer().ExtractPublicKey()
+		pubkeyToEcdsa(pk)
+		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
 			s.Reset()
 		}
@@ -342,17 +353,37 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	return s, err
 }
 
-func (self *Service) OnConnected(callback func(pubKey *ecdsa.PublicKey)) {
+func (self *Service) OnConnected(callback func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
-		pk, _ := conn.RemotePeer().ExtractPublicKey()
-		callback(pubkeyToEcdsa(pk))
+		var (
+			in    bool
+			pk, _ = conn.RemotePeer().ExtractPublicKey()
+		)
+		switch conn.Stat().Direction {
+		case network.DirInbound:
+			in = true
+		case network.DirOutbound:
+			in = false
+		}
+		/*
+			sid := fmt.Sprintf("session:%s%s",
+				strings.Split(conn.RemoteMultiaddr().String(), "tcp/")[1],
+				strings.Split(conn.RemoteMultiaddr().String(), "tcp/")[1],
+			)
+		*/
+		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+		callback(in, sid, pubkeyToEcdsa(pk))
 	}
 }
 
-func (self *Service) OnDisconnected(callback func(pubKey *ecdsa.PublicKey)) {
+func (self *Service) OnDisconnected(callback func(sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
 		pk, _ := conn.RemotePeer().ExtractPublicKey()
-		callback(pubkeyToEcdsa(pk))
+		for _, c := range i.Conns() {
+			c.RemotePeer()
+		}
+		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+		callback(sid, pubkeyToEcdsa(pk))
 	}
 }
 
@@ -448,7 +479,7 @@ func (self *Service) bootstrap() error {
 				case <-self.ctx.Done():
 					return
 				case <-time.After(5 * time.Second):
-					if len(self.host.Network().Conns()) < len(self.bootnodes) {
+					if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
 						err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
 						if err == nil {
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
