@@ -221,7 +221,6 @@ func NewService(cfg Config) *Service {
 	optlist = append(optlist, libp2p.ConnectionManager(connmgr.NewConnManager(600, 900, time.Second*20)))
 
 	host, err := libp2p.New(cfg.Ctx, optlist...)
-
 	if err != nil {
 		panic(err)
 	}
@@ -249,6 +248,18 @@ func NewService(cfg Config) *Service {
 		bootnodes: bootnodes,
 		notifiee:  new(network.NotifyBundle),
 	}
+}
+
+func (self *Service) ClosePeer(pubkey *ecdsa.PublicKey) error {
+	id, err := ECDSAPubEncode(pubkey)
+	if err != nil {
+		return err
+	}
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return err
+	}
+	return self.host.Network().ClosePeer(p)
 }
 
 func (self *Service) SetBootnode(peer ...string) error {
@@ -292,6 +303,8 @@ func (self *Service) SetHandler(pid string, handler func(sessionId string, pubke
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
 			s.Reset()
+		} else {
+			s.Close()
 		}
 	})
 }
@@ -334,13 +347,13 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	}
 
 	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
-	defer func() {
+	/*	defer func() {
 		if err != nil && s != nil {
 			s.Reset()
 		} else if s != nil {
 			s.Close()
 		}
-	}()
+	}()*/
 	if err != nil {
 		log.Println(err)
 		return nil, err

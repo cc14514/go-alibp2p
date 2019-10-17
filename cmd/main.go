@@ -158,8 +158,10 @@ func main() {
 				return err
 			}(s); err != nil {
 				log.Println(err)
+				fmt.Println("Reset stream...")
 				s.Reset()
 			} else {
+				fmt.Println("Close stream...")
 				s.Close()
 			}
 		})

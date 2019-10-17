@@ -43,6 +43,11 @@ func TestNodeid(t *testing.T) {
 	t.Log("b1", len(b1), b1)
 	t.Log("b2", len(b2), b2)
 	h1 := fmt.Sprintf("%x", b2[:])
-	t.Log(len(h1),h1)
+	t.Log(len(h1), h1)
 
+}
+func TestMaddrs(t *testing.T) {
+	url := "/ip4/127.0.0.1/tcp/59464/ipfs/16Uiu2HAm39zRzVr5JK6P1WCba7ew8L5CBT4r5e3wcZ8V2zQRvWSM"
+	a, err := convertPeers([]string{url})
+	fmt.Println(err, a)
 }
