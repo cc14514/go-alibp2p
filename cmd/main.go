@@ -144,6 +144,21 @@ func main() {
 		})
 
 		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
+			defer s.Reset()
+			data, err := ioutil.ReadAll(s)
+			if err != nil {
+				log.Println("ECHO_ERROR", err)
+				return
+			}
+			p := len(data)
+			if p > 10 {
+				p = 10
+			}
+			_, err = s.Write(data)
+			log.Printf("read: total=%d , first 10 : %s , echo-err : %v\n", len(data), data[:p], err)
+		})
+		p2pservice.SetStreamHandler("echo", func(s network.Stream) {
+			defer s.Reset()
 			from := s.Conn().RemotePeer()
 			log.Println("Got a new stream from ", from.Pretty())
 			if err := func(s network.Stream) error {
@@ -152,14 +167,15 @@ func main() {
 				if err != nil {
 					return err
 				}
-
-				log.Printf("read: %s\n", str)
+				p := len(str)
+				if p > 10 {
+					p = 10
+				}
+				log.Printf("read: total=%d , first 10 : %s\n", len(str), str[:p])
 				_, err = s.Write([]byte(str))
 				return err
 			}(s); err != nil {
 				log.Println(err)
-				fmt.Println("Reset stream...")
-				s.Reset()
 			} else {
 				fmt.Println("Close stream...")
 				s.Close()
@@ -187,10 +203,11 @@ var (
 
 func watchpeer() {
 
-	p2pservice.OnConnected(func(inbound bool, session string, pubKey *ecdsa.PublicKey) {
+	p2pservice.OnConnected(alibp2p.CONNT_TYPE_DIRECT, func(inbound bool, session string, pubKey *ecdsa.PublicKey) {
 		k, _ := alibp2p.ECDSAPubEncode(pubKey)
 		peermap.Store(k, time.Now())
-		fmt.Println("OnConnected >", k, session)
+		d, r := p2pservice.Conns()
+		fmt.Println("OnConnected >", k, session, "::", d, r)
 	})
 
 	p2pservice.OnDisconnected(func(session string, pubKey *ecdsa.PublicKey) {
@@ -244,6 +261,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	to := args["to"].(string)
 	msg := args["msg"].(string)
 	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
+	defer _s.Reset()
 	rtn := ""
 	success := true
 	if err != nil {
@@ -253,10 +271,9 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 		buf, err := ioutil.ReadAll(_s)
 		rtn = string(buf)
 		if err != nil {
-			_s.Reset()
-		} else {
-			_s.Close()
+			log.Println("ECHO_ERROR", err)
 		}
+		_s.Close()
 	}
 	return rpcserver.Success{
 		Success: success,
@@ -459,6 +476,7 @@ var (
 		out.WriteTo(os.Stdout)
 		fmt.Println()
 	}
+
 	Funcs = map[string]cmdFn{
 		"help": func(args ...string) (interface{}, error) {
 			fmt.Println("------------------------------")
@@ -496,6 +514,34 @@ var (
 				defer resp.Body.Close()
 			}
 			printResp(resp)
+			return nil, nil
+		},
+		"loopecho": func(args ...string) (interface{}, error) {
+			to, msg, total := args[0], args[1], args[2]
+			c, _ := strconv.Atoi(total)
+			data := make([]byte, 2048)
+			for i := 0; i < len(data); i++ {
+				data[i] = 97
+			}
+
+			for i := 0; i < c; i++ {
+				copy(data, []byte(fmt.Sprintf("%d-->%s", i, msg))[:])
+				resp, err := http.Get(api_echo(to, string(data)))
+				if err != nil {
+					log.Println("error", err)
+				}
+				if resp != nil && resp.Body != nil {
+					defer resp.Body.Close()
+				}
+
+				success := rpcserver.SuccessFromReader(resp.Body)
+				if success.Success {
+					entity := success.Entity.(map[string]interface{})
+					fmt.Println(i, len(data), "recv-success", len(entity["Data"].(string)))
+				} else {
+					fmt.Println(i, len(data), "recv-error", success.Entity)
+				}
+			}
 			return nil, nil
 		},
 		"put": func(args ...string) (interface{}, error) {
