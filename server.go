@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
+	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
@@ -78,9 +79,9 @@ var (
 		return priv3, err
 	}
 
-	bootstrapConnect = func(ctx context.Context, ph host.Host, peers []peer.AddrInfo) error {
+	connectFn = func(ctx context.Context, ph host.Host, peers []peer.AddrInfo) error {
 		if len(peers) < 1 {
-			return errors.New("not enough bootstrap peers")
+			return errors.New("not enough peers to connect")
 		}
 
 		errs := make(chan error, len(peers))
@@ -92,17 +93,17 @@ var (
 			wg.Add(1)
 			go func(p peer.AddrInfo) {
 				defer wg.Done()
-				defer log.Println(ctx, "bootstrapDial", ph.ID(), p.ID)
-				log.Printf("%s bootstrapping to %s : %v", ph.ID(), p.ID, p.Addrs)
+				defer log.Println("connect to", ph.ID(), p.ID)
+				log.Printf("%s connecting to %s : %v", ph.ID(), p.ID, p.Addrs)
 				ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 				if err := ph.Connect(ctx, p); err != nil {
-					log.Println(ctx, "bootstrapDialFailed", p.ID)
-					log.Printf("failed to bootstrap with %v: %s", p.ID, err)
+					log.Println("connect failed", p.ID)
+					log.Printf("failed to connect with %v: %s", p.ID, err)
 					errs <- err
 					return
 				}
-				log.Println(ctx, "bootstrapDialSuccess", p.ID, ph.Peerstore().PeerInfo(p.ID))
-				log.Printf("bootstrapped with %v", p.ID)
+				log.Println("connect success", p.ID, ph.Peerstore().PeerInfo(p.ID))
+				log.Printf("connected with %v", p.ID)
 			}(p)
 		}
 		wg.Wait()
@@ -115,7 +116,7 @@ var (
 			}
 		}
 		if count == len(peers) {
-			return fmt.Errorf("failed to bootstrap. %s", err)
+			return fmt.Errorf("failed to connect. %s", err)
 		}
 		return nil
 	}
@@ -163,15 +164,23 @@ var (
 
 type (
 	Service struct {
-		ctx       context.Context
-		homedir   string
-		host      host.Host
-		router    routing.Routing
-		bootnodes []peer.AddrInfo
-		cfg       Config
-		notifiee  *network.NotifyBundle
+		ctx        context.Context
+		homedir    string
+		host       host.Host
+		router     routing.Routing
+		bootnodes  []peer.AddrInfo
+		cfg        Config
+		notifiee   *network.NotifyBundle
+		isDirectFn func(id string) bool
 	}
 	blankValidator struct{}
+	ConnType       int
+)
+
+const (
+	CONNT_TYPE_DIRECT ConnType = iota
+	CONN_TYPE_RELAY
+	CONN_TYPE_ALL
 )
 
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
@@ -218,7 +227,7 @@ func NewService(cfg Config) *Service {
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
 	}
-	optlist = append(optlist, libp2p.ConnectionManager(connmgr.NewConnManager(600, 900, time.Second*20)))
+	optlist = append(optlist, libp2p.ConnectionManager(connmgr.NewConnManager(50, 500, time.Second*20)))
 
 	host, err := libp2p.New(cfg.Ctx, optlist...)
 	if err != nil {
@@ -239,7 +248,7 @@ func NewService(cfg Config) *Service {
 	}
 
 	log.Println("New Service end =========>")
-	return &Service{
+	service := &Service{
 		cfg:       cfg,
 		ctx:       cfg.Ctx,
 		homedir:   cfg.Homedir,
@@ -248,6 +257,18 @@ func NewService(cfg Config) *Service {
 		bootnodes: bootnodes,
 		notifiee:  new(network.NotifyBundle),
 	}
+
+	service.isDirectFn = func(id string) bool {
+		direct, _ := service.Conns()
+		for _, url := range direct {
+			if strings.Contains(url, id) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return service
 }
 
 func (self *Service) ClosePeer(pubkey *ecdsa.PublicKey) error {
@@ -296,15 +317,16 @@ func (self *Service) GetConn(pid string) chan SConn {
 
 func (self *Service) SetHandler(pid string, handler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
+		defer func() {
+			s.Close()
+			s.Reset()
+		}()
 		conn := s.Conn()
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
 		pk, _ := s.Conn().RemotePeer().ExtractPublicKey()
 		pubkeyToEcdsa(pk)
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
-			s.Reset()
-		} else {
-			s.Close()
 		}
 	})
 }
@@ -313,6 +335,15 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 	self.host.SetStreamHandler(protocol.ID(protoid), handler)
 }
 
+func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
+	s, err := self.SendMsg(to, protocolID, msg)
+	defer func() {
+		if err == nil && s != nil {
+			s.Close()
+		}
+	}()
+	return err
+}
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream, error) {
 	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
@@ -347,13 +378,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	}
 
 	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
-	/*	defer func() {
-		if err != nil && s != nil {
-			s.Reset()
-		} else if s != nil {
-			s.Close()
-		}
-	}()*/
+
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -366,8 +391,22 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (network.Stream,
 	return s, err
 }
 
-func (self *Service) OnConnected(callback func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)) {
+func (self *Service) OnConnected(t ConnType, callback func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
+
+		switch t {
+		case CONNT_TYPE_DIRECT:
+			if !self.isDirectFn(conn.RemotePeer().Pretty()) {
+				log.Println("alibp2p-OnConnected skip : want direct :", conn.RemotePeer().Pretty())
+				return
+			}
+		case CONN_TYPE_RELAY:
+			if self.isDirectFn(conn.RemotePeer().Pretty()) {
+				fmt.Println("alibp2p-OnConnected skip : want relay :", conn.RemotePeer().Pretty())
+				return
+			}
+		case CONN_TYPE_ALL:
+		}
 		var (
 			in    bool
 			pk, _ = conn.RemotePeer().ExtractPublicKey()
@@ -405,6 +444,19 @@ func (self *Service) Start() {
 	if self.cfg.Discover {
 		self.bootstrap()
 	}
+}
+
+func (self *Service) Table() map[string][]string {
+	r := make(map[string][]string, 0)
+	for _, p := range self.host.Peerstore().Peers() {
+		a := make([]string, 0)
+		pi := self.host.Peerstore().PeerInfo(p)
+		for _, addr := range pi.Addrs {
+			a = append(a, addr.String())
+		}
+		r[p.Pretty()] = a
+	}
+	return r
 }
 
 func (self *Service) Conns() (direct []string, relay []string) {
@@ -476,6 +528,14 @@ func (self *Service) Get(k string) ([]byte, error) {
 	return self.router.GetValue(self.ctx, fmt.Sprintf("/%s/%s", NamespaceDHT, k))
 }
 
+func (self *Service) BootstrapOnce() error {
+	err := self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
+	if err != nil {
+		log.Println("bootstrap-error", "err", err)
+	}
+	return err
+}
+
 func (self *Service) bootstrap() error {
 	log.Println("host-addrs", self.host.Addrs())
 	log.Println("host-network-listen", self.host.Network().ListenAddresses())
@@ -493,8 +553,16 @@ func (self *Service) bootstrap() error {
 					return
 				case <-time.After(5 * time.Second):
 					if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
-						err := bootstrapConnect(self.ctx, self.host, self.bootnodes)
+						// 在 peerstore 中随机找至多 5 个节点尝试连接
+						var (
+							limit  = 3
+							others = self.peersWithoutBootnodes()
+							total  = len(others)
+						)
+						log.Println("bootstrap looping")
+						err := connectFn(self.ctx, self.host, self.bootnodes)
 						if err == nil {
+							log.Println("bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
 								log.Println("Bootstrap the host")
 								err = self.router.Bootstrap(self.ctx)
@@ -503,11 +571,15 @@ func (self *Service) bootstrap() error {
 								}
 							} else {
 								log.Println("Reconnected and bootstrap the host once")
-								err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
-								if err != nil {
-									log.Println("bootstrap-error", "err", err)
-								}
+								self.BootstrapOnce()
 							}
+						} else if total > 0 {
+							if total < limit {
+								limit = total
+							}
+							tasks := randPeers(others, limit)
+							err := connectFn(self.ctx, self.host, tasks)
+							log.Println("bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
 						}
 					}
 				}
@@ -516,4 +588,44 @@ func (self *Service) bootstrap() error {
 		log.Println("loopboot-end")
 	}()
 	return nil
+}
+
+func randPeers(others []peer.AddrInfo, limit int) []peer.AddrInfo {
+	_, randk, _ := crypto.GenerateRSAKeyPair(1024, rand.Reader)
+	rnBytes, _ := randk.Bytes()
+	n := new(big.Int).Mod(new(big.Int).SetBytes(rnBytes), big.NewInt(int64(len(others)))).Int64()
+	others = append(others[n:], others[:n]...)
+	others = others[:limit]
+	return others
+}
+
+func (self *Service) peersWithoutBootnodes() []peer.AddrInfo {
+	var (
+		result  = make([]peer.AddrInfo, 0)
+		bootmap = make(map[string]interface{})
+	)
+	for _, b := range self.bootnodes {
+		bootmap[b.ID.Pretty()] = struct{}{}
+	}
+
+	for _, p := range self.host.Peerstore().Peers() {
+		if _, ok := bootmap[p.Pretty()]; ok {
+			continue
+		}
+		if p.Pretty() == self.host.ID().Pretty() {
+			continue
+		}
+		if pi := self.host.Peerstore().PeerInfo(p); pi.Addrs != nil && len(pi.Addrs) > 0 {
+			result = append(result, pi)
+		}
+	}
+
+	return result
+}
+
+func GetBuf(size int) []byte {
+	return pool.Get(size)
+}
+func PutBuf(buf []byte) {
+	pool.Put(buf)
 }

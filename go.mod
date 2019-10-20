@@ -4,6 +4,7 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
 	github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb
 	github.com/cc14514/go-lightrpc v0.0.0-20191009082400-f2eba654f95d
+	github.com/libp2p/go-buffer-pool v0.0.2
 	github.com/libp2p/go-libp2p v0.1.0
 	github.com/libp2p/go-libp2p-circuit v0.1.0
 	github.com/libp2p/go-libp2p-connmgr v0.1.0

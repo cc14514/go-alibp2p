@@ -1,8 +1,10 @@
 package alibp2p
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"sync/atomic"
@@ -50,4 +52,23 @@ func TestMaddrs(t *testing.T) {
 	url := "/ip4/127.0.0.1/tcp/59464/ipfs/16Uiu2HAm39zRzVr5JK6P1WCba7ew8L5CBT4r5e3wcZ8V2zQRvWSM"
 	a, err := convertPeers([]string{url})
 	fmt.Println(err, a)
+}
+
+func TestRand(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		var (
+			limit = 5
+			tasks = []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+			total = len(tasks)
+		)
+		if total < limit {
+			limit = total
+		}
+		// TODO 随机选出几个进行尝试
+		_, randk, _ := crypto.GenerateRSAKeyPair(512, rand.Reader)
+		rnBytes, _ := randk.Bytes()
+		n := new(big.Int).Mod(new(big.Int).SetBytes(rnBytes), big.NewInt(int64(total))).Int64()
+		tasks = append(tasks[n:], tasks[:n]...)
+		fmt.Println("-->", total, limit, n, tasks[:limit],tasks[:], len(tasks))
+	}
 }
