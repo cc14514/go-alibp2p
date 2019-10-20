@@ -2,6 +2,7 @@ package identify
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -220,7 +221,8 @@ func (ids *IDService) populateMessage(mes *pb.Identify, c network.Conn) {
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + ids.Host.ID().Pretty())
 	laddrs = append(laddrs, raddr)
 	// add by liangc <<
-	//fmt.Println("<><><><><><><><> request", ids.Host.ID().Pretty(), laddrs)
+	fmt.Println("<><><><><><><><> request", "local", ids.Host.ID().Pretty(), laddrs)
+	fmt.Println("<><><><><><><><> request", "remote", c.RemotePeer(), c.RemoteMultiaddr())
 	mes.ListenAddrs = make([][]byte, len(laddrs))
 	for i, addr := range laddrs {
 		mes.ListenAddrs[i] = addr.Bytes()
