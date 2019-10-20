@@ -436,6 +436,20 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 			)
 		*/
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+
+		rpi := self.host.Peerstore().PeerInfo(conn.RemotePeer())
+		hasRemoteAddr := false
+		for _, addr := range rpi.Addrs {
+			if addr == conn.RemoteMultiaddr() {
+				hasRemoteAddr = true
+				break
+			}
+		}
+		if !hasRemoteAddr {
+			self.host.Peerstore().AddAddr(conn.RemotePeer(), conn.RemoteMultiaddr(), peerstore.TempAddrTTL)
+			fmt.Println("-- ResetPubAddr -->", conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
+		}
+		rpi = self.host.Peerstore().PeerInfo(conn.RemotePeer())
 		callback(in, sid, pubkeyToEcdsa(pk))
 	}
 }
