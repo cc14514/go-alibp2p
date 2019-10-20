@@ -206,6 +206,7 @@ func NewService(cfg Config) *Service {
 	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
 
 	optlist := []libp2p.Option{
+		libp2p.NATPortMap(),
 		libp2p.ListenAddrs(listen0),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
