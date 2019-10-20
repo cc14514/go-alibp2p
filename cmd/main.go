@@ -11,6 +11,7 @@ import (
 	"github.com/cc14514/go-alibp2p"
 	"github.com/cc14514/go-cookiekit/graph"
 	"github.com/cc14514/go-lightrpc/rpcserver"
+	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/urfave/cli"
 	"io"
@@ -143,8 +144,8 @@ func main() {
 			return nil
 		})
 
-		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
-			defer s.Reset()
+		p2pservice.SetStreamHandler("echo", func(s network.Stream) {
+			defer helpers.FullClose(s)
 			data, err := ioutil.ReadAll(s)
 			if err != nil {
 				log.Println("ECHO_ERROR", err)
@@ -157,8 +158,8 @@ func main() {
 			_, err = s.Write(data)
 			log.Printf("read: total=%d , first 10 : %s , echo-err : %v\n", len(data), data[:p], err)
 		})
-		p2pservice.SetStreamHandler("echo", func(s network.Stream) {
-			defer s.Reset()
+		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
+			defer helpers.FullClose(s)
 			from := s.Conn().RemotePeer()
 			log.Println("Got a new stream from ", from.Pretty())
 			if err := func(s network.Stream) error {
@@ -175,10 +176,9 @@ func main() {
 				_, err = s.Write([]byte(str))
 				return err
 			}(s); err != nil {
-				log.Println(err)
+				fmt.Println("error", err)
 			} else {
 				fmt.Println("Close stream...")
-				s.Close()
 			}
 		})
 		go p2pservice.Start()
@@ -261,7 +261,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	to := args["to"].(string)
 	msg := args["msg"].(string)
 	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
-	defer _s.Reset()
+	defer helpers.FullClose(_s)
 	rtn := ""
 	success := true
 	if err != nil {

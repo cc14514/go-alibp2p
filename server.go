@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
+	lru "github.com/hashicorp/golang-lru"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -41,6 +43,7 @@ const (
 )
 
 var (
+	pubkeyCache, _          = lru.New(10000)
 	loopboot, loopbootstrap int32
 
 	DefaultProtocols = []protocol.ID{ProtocolDHT}
@@ -154,10 +157,7 @@ var (
 		if err != nil {
 			return nil, err
 		}
-		pub, err := id.ExtractPublicKey()
-		if err != nil {
-			return nil, err
-		}
+		pub := id2pubkey(id)
 		return pubkeyToEcdsa(pub), nil
 	}
 )
@@ -316,15 +316,26 @@ func (self *Service) GetConn(pid string) chan SConn {
 }
 */
 
+func id2pubkey(id peer.ID) crypto.PubKey {
+	v, ok := pubkeyCache.Get(id)
+	if ok {
+		return v.(crypto.PubKey)
+	}
+	k, _ := id.ExtractPublicKey()
+	pubkeyCache.Add(id, k)
+	return k
+}
+
 func (self *Service) SetHandler(pid string, handler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		defer func() {
-			s.Close()
-			s.Reset()
+			if s != nil {
+				helpers.FullClose(s)
+			}
 		}()
 		conn := s.Conn()
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		pk, _ := s.Conn().RemotePeer().ExtractPublicKey()
+		pk := id2pubkey(s.Conn().RemotePeer())
 		pubkeyToEcdsa(pk)
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
@@ -339,8 +350,8 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	s, err := self.SendMsg(to, protocolID, msg)
 	defer func() {
-		if err == nil && s != nil {
-			s.Close()
+		if s != nil {
+			helpers.FullClose(s)
 		}
 	}()
 	return err
@@ -409,8 +420,8 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 		case CONN_TYPE_ALL:
 		}
 		var (
-			in    bool
-			pk, _ = conn.RemotePeer().ExtractPublicKey()
+			in bool
+			pk = id2pubkey(conn.RemotePeer())
 		)
 		switch conn.Stat().Direction {
 		case network.DirInbound:
@@ -431,7 +442,7 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 
 func (self *Service) OnDisconnected(callback func(sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
-		pk, _ := conn.RemotePeer().ExtractPublicKey()
+		pk := id2pubkey(conn.RemotePeer())
 		for _, c := range i.Conns() {
 			c.RemotePeer()
 		}
