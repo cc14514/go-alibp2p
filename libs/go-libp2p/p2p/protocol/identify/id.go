@@ -282,7 +282,8 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + p.Pretty())
 	lmaddrs = append(lmaddrs, raddr)
 	// add by liangc <<
-	//fmt.Println("<><><><><><><><> response", p.Pretty(), lmaddrs)
+	fmt.Println("<><><><><><><><> response", "remote-conn", c.RemotePeer(), c.RemoteMultiaddr())
+	fmt.Println("<><><><><><><><> response", "remote-maddr", p.Pretty(), lmaddrs)
 
 	// NOTE: Do not add `c.RemoteMultiaddr()` to the peerstore if the remote
 	// peer doesn't tell us to do so. Otherwise, we'll advertise it.
