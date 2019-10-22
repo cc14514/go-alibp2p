@@ -3,7 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
-
+	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -13,10 +13,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/routing"
-
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	relay "github.com/libp2p/go-libp2p/p2p/host/relay"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
+	"github.com/libp2p/go-tcp-transport"
 
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -162,7 +162,13 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		h.Close()
 		return nil, err
 	}
+
+	// add by liangc
+	var tcpTransport *tcp.TcpTransport
 	for _, t := range tpts {
+		if tcpt, ok := t.(*tcp.TcpTransport); ok {
+			tcpTransport = tcpt
+		}
 		err = swrm.AddTransport(t)
 		if err != nil {
 			h.Close()
@@ -180,7 +186,22 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 
 	// TODO: This method succeeds if listening on one address succeeds. We
 	// should probably fail if listening on *any* addr fails.
-	if err := h.Network().Listen(cfg.ListenAddrs...); err != nil {
+
+	// 把 mux url 摘出来，单独处理
+	var (
+		normalAddr   = make([]ma.Multiaddr, 0)
+		muxAddr      ma.Multiaddr
+		muxTransport = netmux.NewMuxTransport(tcpTransport)
+	)
+	for i, maddr := range cfg.ListenAddrs {
+		fmt.Println(">>>>>>>>>>>", i, maddr)
+		if muxTransport.CanDial(maddr) {
+			muxAddr = maddr
+		} else {
+			normalAddr = append(normalAddr, maddr)
+		}
+	}
+	if err := h.Network().Listen(normalAddr...); err != nil {
 		h.Close()
 		return nil, err
 	}
@@ -190,6 +211,21 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	if cfg.Routing != nil {
 		router, err = cfg.Routing(h)
 		if err != nil {
+			h.Close()
+			return nil, err
+		}
+	}
+
+	// add by liangc
+	if muxAddr != nil {
+		list, err := tcpTransport.GetListen()
+		fmt.Println("<><><><>", list, err, muxAddr)
+		err = swrm.AddTransport(muxTransport)
+		if err != nil {
+			h.Close()
+			return nil, err
+		}
+		if err := h.Network().Listen(muxAddr); err != nil {
 			h.Close()
 			return nil, err
 		}

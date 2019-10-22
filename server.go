@@ -203,11 +203,12 @@ func NewService(cfg Config) *Service {
 	//hid, _ := peer.IDFromPublicKey(priv.GetPublic())
 	//relayaddr, err := ma.NewMultiaddr("/p2p-circuit/ipfs/" + h3.ID().Pretty())
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
+	listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/5978:%d", cfg.Port))
 	//listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", hid.Pretty()))
-
+	//fmt.Println("Listen", listen0)
 	optlist := []libp2p.Option{
 		libp2p.NATPortMap(),
-		libp2p.ListenAddrs(listen0),
+		libp2p.ListenAddrs(listen0, listen1),
 		libp2p.Identity(priv),
 		libp2p.EnableAutoRelay(),
 		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
@@ -234,6 +235,8 @@ func NewService(cfg Config) *Service {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println("###########>", host.Network().ListenAddresses())
 
 	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
@@ -447,7 +450,7 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 		}
 		if !hasRemoteAddr {
 			self.host.Peerstore().AddAddr(conn.RemotePeer(), conn.RemoteMultiaddr(), peerstore.TempAddrTTL)
-			fmt.Println("-- ResetPubAddr -->", conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
+			log.Println("-- alibp2p - ResetPubAddr -->", conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
 		}
 		rpi = self.host.Peerstore().PeerInfo(conn.RemotePeer())
 		callback(in, sid, pubkeyToEcdsa(pk))
