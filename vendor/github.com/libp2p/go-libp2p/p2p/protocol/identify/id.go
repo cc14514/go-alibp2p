@@ -319,7 +319,8 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 			// 如果已经在 ipmap 中就不用处理了
 			if (rip == "127.0.0.1" || rip == "localhost") && localMux {
 				// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
-				_, err := netmux.GetRealIP(c.RemoteMultiaddr(), c.LocalMultiaddr())
+				_, _, fport, _ := netmux.SplitMuxAddr(muxAddr)
+				_, err := netmux.GetRealIP(c.RemoteMultiaddr(), c.LocalMultiaddr(), fport)
 				fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr(), err)
 			} else if _, ok := ipmap[rip]; !ok {
 				// 将公网 ip 加入 地址列表, 只处理 tcp4 和 mux 协议

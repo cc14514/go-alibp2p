@@ -31,8 +31,10 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -316,7 +318,7 @@ func MaddrsToIps(maddrs []ma.Multiaddr) map[string]string {
 	return ipmap
 }
 
-func GetRealIP(r, l ma.Multiaddr) (string, error) {
+func GetRealIP(r, l ma.Multiaddr, muxport int) (string, error) {
 	_, a, err := manet.DialArgs(r)
 	if err != nil {
 		return "", err
@@ -325,7 +327,24 @@ func GetRealIP(r, l ma.Multiaddr) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	session := a + b
+	session := fmt.Sprintf("%s%s", strings.Split(a, ":")[1], strings.Split(b, ":")[1])
 	fmt.Println("get-realip-from-netmux", r, l, "session=", session)
-	return session, nil
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/chainmux/realip", muxport)
+	client := &http.Client{}
+	request, _ := http.NewRequest("GET", url, nil)
+	request.Header.Add("sessionid", session)
+	response, err := client.Do(request)
+	fmt.Println("-- get realip --> err", err, request.Header.Get("sessionid"))
+	if err != nil {
+		return "", err
+	} else {
+		defer response.Body.Close()
+		data, err := ioutil.ReadAll(response.Body)
+		if response.StatusCode == 200 {
+			fmt.Println("<-- get realip --", err, response.StatusCode, string(data))
+			return string(data), nil
+		}
+		return "", fmt.Errorf("get realip fail : statecode %d", response.StatusCode)
+	}
 }
