@@ -224,10 +224,6 @@ func (ids *IDService) populateMessage(mes *pb.Identify, c network.Conn) {
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + ids.Host.ID().Pretty())
 	laddrs = append(laddrs, raddr)
 	// add by liangc <<
-	//fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ -->", c.RemotePeer())
-	//fmt.Println("local", laddrs)
-	//fmt.Println("remote", c.RemoteMultiaddr())
-	//fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ -->", c.RemotePeer())
 	mes.ListenAddrs = make([][]byte, len(laddrs))
 	for i, addr := range laddrs {
 		mes.ListenAddrs[i] = addr.Bytes()
@@ -293,29 +289,23 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	if !containsPubaddr {
 		lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
 	}
-	// add by liangc <<
 
-	//fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ <--", c.RemotePeer(), c.RemoteMultiaddr())
 	isRelay := strings.Contains(c.RemoteMultiaddr().String(), "/p2p-circuit")
 	ipmap := netmux.MaddrsToIps(lmaddrs)
 	portmap := netmux.MaddrsToPorts(lmaddrs)
-	//fmt.Println("local", ids.Host.Addrs())
-	//fmt.Println("remote", ipmap, portmap)
-	//fmt.Println("realay", isRelay)
-	//fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ <--", c.RemotePeer(), c.RemoteMultiaddr())
 
 	if !isRelay {
 		muxAddr, localMux := netmux.MuxAddress(ids.Host.Addrs())
-		fmt.Println("> ipmap", ipmap)
-		fmt.Println("> portmap", portmap)
-		fmt.Println("> localMux", localMux, muxAddr)
-		fmt.Println("> remoteAddr", c.RemoteMultiaddr())
+		//fmt.Println("> ipmap", ipmap)
+		//fmt.Println("> portmap", portmap)
+		//fmt.Println("> localMux", localMux, muxAddr)
+		//fmt.Println("> remoteAddr", c.RemoteMultiaddr())
 		// 拆公网 IP 并拼装到 pi 中
 		if _, ipp, err := manet.DialArgs(c.RemoteMultiaddr()); err == nil {
-			fmt.Println("> ipp", ipp)
+			//fmt.Println("> ipp", ipp)
 			// 公网 IP
 			rip := strings.Split(ipp, ":")[0]
-			fmt.Println("> rip", rip)
+			//fmt.Println("> rip", rip)
 			// 如果已经在 ipmap 中就不用处理了
 			if (rip == "127.0.0.1" || rip == "localhost") && localMux {
 				// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
@@ -331,7 +321,7 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 				for port, proto := range portmap {
 					raddr := fmt.Sprintf("/ip4/%s/%s/%s", rip, proto, port)
 					mraddr, err := ma.NewMultiaddr(raddr)
-					fmt.Println("idservice-set-realip >>", err, raddr)
+					//fmt.Println("idservice-set-realip >>", err, raddr)
 					if err == nil {
 						lmaddrs = append(lmaddrs, mraddr)
 					}
@@ -339,6 +329,7 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 			}
 		}
 	}
+	// add by liangc <<
 
 	// NOTE: Do not add `c.RemoteMultiaddr()` to the peerstore if the remote
 	// peer doesn't tell us to do so. Otherwise, we'll advertise it.
