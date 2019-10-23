@@ -271,7 +271,11 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	msg := args["msg"].(string)
 	fmt.Println(" Echo ==>", to)
 	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
-	defer helpers.FullClose(_s)
+	defer func() {
+		if _s != nil {
+			helpers.FullClose(_s)
+		}
+	}()
 	rtn := ""
 	success := true
 	if err != nil {
