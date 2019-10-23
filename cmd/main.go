@@ -34,13 +34,13 @@ const (
 )
 
 var (
-	Stop                     = make(chan struct{})
-	homedir, bootnodes       string
-	port, networkid, rpcport int
-	nodiscover               bool
-	p2pservice               *alibp2p.Service
-	ServiceRegMap            = make(map[string]rpcserver.ServiceReg)
-	genServiceReg            = func(namespace, version string, service interface{}) {
+	Stop                              = make(chan struct{})
+	homedir, bootnodes                string
+	port, networkid, rpcport, muxport int
+	nodiscover                        bool
+	p2pservice                        *alibp2p.Service
+	ServiceRegMap                     = make(map[string]rpcserver.ServiceReg)
+	genServiceReg                     = func(namespace, version string, service interface{}) {
 		ServiceRegMap[namespace] = rpcserver.ServiceReg{
 			Namespace: namespace,
 			Version:   version,
@@ -72,6 +72,12 @@ func main() {
 			Usage:       "HTTP-RPC server listening `PORT`",
 			Value:       8080,
 			Destination: &rpcport,
+		},
+		cli.IntFlag{
+			Name:        "mux",
+			Usage:       "netmux service port",
+			Value:       0,
+			Destination: &muxport,
 		},
 		cli.IntFlag{
 			Name:        "port",
@@ -124,6 +130,9 @@ func main() {
 		if bootnodes != "" {
 			log.Println("bootnodes=", bootnodes)
 			cfg.Bootnodes = strings.Split(bootnodes, ",")
+		}
+		if muxport > 0 {
+			cfg.MuxPort = big.NewInt(int64(muxport))
 		}
 		p2pservice = alibp2p.NewService(cfg)
 		watchpeer()

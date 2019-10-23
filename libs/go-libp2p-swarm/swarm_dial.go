@@ -455,7 +455,7 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 	log.Debugf("%s swarm dialing %s %s", s.local, p, addr)
 
 	tpt := s.TransportForDialing(addr)
-	fmt.Println("------ swarm : dialAddr ------>", p.Pretty(), addr, tpt, s.transports.m)
+	//fmt.Println("------ swarm : dialAddr ------>", p.Pretty(), addr, tpt, s.transports.m)
 	if tpt == nil {
 		return nil, ErrNoTransport
 	}

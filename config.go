@@ -22,6 +22,7 @@ type Config struct {
 	Bootnodes []string
 	Discover  bool
 	Networkid *big.Int
+	MuxPort   *big.Int
 	PrivKey   *ecdsa.PrivateKey
 }
 
