@@ -315,3 +315,17 @@ func MaddrsToIps(maddrs []ma.Multiaddr) map[string]string {
 	}
 	return ipmap
 }
+
+func GetRealIP(r, l ma.Multiaddr) (string, error) {
+	_, a, err := manet.DialArgs(r)
+	if err != nil {
+		return "", err
+	}
+	_, b, err := manet.DialArgs(l)
+	if err != nil {
+		return "", err
+	}
+	session := a + b
+	fmt.Println("get-realip-from-netmux", r, l, "session=", session)
+	return session, nil
+}

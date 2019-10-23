@@ -305,10 +305,10 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	//fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ <--", c.RemotePeer(), c.RemoteMultiaddr())
 
 	if !isRelay {
-		_, localMux := netmux.MuxAddress(ids.Host.Addrs())
+		muxAddr, localMux := netmux.MuxAddress(ids.Host.Addrs())
 		fmt.Println("> ipmap", ipmap)
 		fmt.Println("> portmap", portmap)
-		fmt.Println("> localMux", localMux)
+		fmt.Println("> localMux", localMux, muxAddr)
 		fmt.Println("> remoteAddr", c.RemoteMultiaddr())
 		// 拆公网 IP 并拼装到 pi 中
 		if _, ipp, err := manet.DialArgs(c.RemoteMultiaddr()); err == nil {
@@ -319,7 +319,8 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 			// 如果已经在 ipmap 中就不用处理了
 			if (rip == "127.0.0.1" || rip == "localhost") && localMux {
 				// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
-				fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr())
+				_, err := netmux.GetRealIP(c.RemoteMultiaddr(), c.LocalMultiaddr())
+				fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr(), err)
 			} else if _, ok := ipmap[rip]; !ok {
 				// 将公网 ip 加入 地址列表, 只处理 tcp4 和 mux 协议
 				/*
