@@ -294,7 +294,7 @@ func MaddrsToPorts(maddrs []ma.Multiaddr) map[string]string {
 			portmap[fmt.Sprintf("%d:%d", fport, tport)] = MuxProtocol.Name
 		} else {
 			p, h, err := manet.DialArgs(maddr)
-			fmt.Println(err, p, h)
+			//fmt.Println(err, p, h)
 			if err == nil && strings.Contains(h, ":") {
 				portmap[strings.Split(h, ":")[1]] = p
 			}
@@ -307,8 +307,10 @@ func MaddrsToIps(maddrs []ma.Multiaddr) map[string]string {
 	for _, maddr := range maddrs {
 		if maddr != nil {
 			x, y, e := manet.DialArgs(maddr)
-			fmt.Println(x, y, e)
-			ipmap[strings.Split(y, ":")[0]] = x
+			//fmt.Println(x, y, e)
+			if e == nil {
+				ipmap[strings.Split(y, ":")[0]] = x
+			}
 		}
 	}
 	return ipmap

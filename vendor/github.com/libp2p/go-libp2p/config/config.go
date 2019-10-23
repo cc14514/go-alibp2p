@@ -193,6 +193,12 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		muxAddr      ma.Multiaddr
 		muxTransport = netmux.NewMuxTransport(tcpTransport)
 	)
+	err = swrm.AddTransport(muxTransport)
+	if err != nil {
+		h.Close()
+		return nil, err
+	}
+
 	for i, maddr := range cfg.ListenAddrs {
 		fmt.Println(">>>>>>>>>>>", i, maddr)
 		if muxTransport.CanDial(maddr) {
@@ -220,11 +226,6 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	if muxAddr != nil {
 		list, err := tcpTransport.GetListen()
 		fmt.Println("<><><><>", list, err, muxAddr)
-		err = swrm.AddTransport(muxTransport)
-		if err != nil {
-			h.Close()
-			return nil, err
-		}
 		if err := h.Network().Listen(muxAddr); err != nil {
 			h.Close()
 			return nil, err

@@ -306,28 +306,32 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 
 	if !isRelay {
 		_, localMux := netmux.MuxAddress(ids.Host.Addrs())
+		fmt.Println("> ipmap", ipmap)
+		fmt.Println("> portmap", portmap)
+		fmt.Println("> localMux", localMux)
+		fmt.Println("> remoteAddr", c.RemoteMultiaddr())
 		// 拆公网 IP 并拼装到 pi 中
 		if _, ipp, err := manet.DialArgs(c.RemoteMultiaddr()); err == nil {
+			fmt.Println("> ipp", ipp)
 			// 公网 IP
 			rip := strings.Split(ipp, ":")[0]
+			fmt.Println("> rip", rip)
 			// 如果已经在 ipmap 中就不用处理了
-			if _, ok := ipmap[rip]; !ok {
-				if (rip == "127.0.0.1" || rip == "localhost") && localMux {
-					// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
-					fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr())
-				} else {
-					// 将公网 ip 加入 地址列表, 只处理 tcp4 和 mux 协议
-					/*
-						/ip4/169.254.115.102/tcp/10001
-						/ip4/127.0.0.1/mux/5978:10001
-					*/
-					for port, proto := range portmap {
-						raddr := fmt.Sprintf("/ip4/%s/%s/%s", rip, proto, port)
-						mraddr, err := ma.NewMultiaddr(raddr)
-						fmt.Println("RRRRRRRRRRRRRRRRRRRRRRR>>", err, raddr)
-						if err == nil {
-							lmaddrs = append(lmaddrs, mraddr)
-						}
+			if (rip == "127.0.0.1" || rip == "localhost") && localMux {
+				// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
+				fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr())
+			} else if _, ok := ipmap[rip]; !ok {
+				// 将公网 ip 加入 地址列表, 只处理 tcp4 和 mux 协议
+				/*
+					/ip4/169.254.115.102/tcp/10001
+					/ip4/127.0.0.1/mux/5978:10001
+				*/
+				for port, proto := range portmap {
+					raddr := fmt.Sprintf("/ip4/%s/%s/%s", rip, proto, port)
+					mraddr, err := ma.NewMultiaddr(raddr)
+					fmt.Println("idservice-rip >>", err, raddr)
+					if err == nil {
+						lmaddrs = append(lmaddrs, mraddr)
 					}
 				}
 			}
