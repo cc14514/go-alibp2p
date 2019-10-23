@@ -298,7 +298,14 @@ func MaddrsToPorts(maddrs []ma.Multiaddr) map[string]string {
 			p, h, err := manet.DialArgs(maddr)
 			//fmt.Println(err, p, h)
 			if err == nil && strings.Contains(h, ":") {
-				portmap[strings.Split(h, ":")[1]] = p
+				net := p
+				switch p {
+				case "tcp4", "tcp6":
+					net = "tcp"
+				case "udp4", "udp6":
+					net = "udp"
+				}
+				portmap[strings.Split(h, ":")[1]] = net
 			}
 		}
 	}
