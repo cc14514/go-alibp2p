@@ -320,9 +320,9 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 			if (rip == "127.0.0.1" || rip == "localhost") && localMux {
 				// TODO 如果本地开启 mux 服务并且远端 ip 是来自 localhost 则去 mux 询问
 				_, _, fport, _ := netmux.SplitMuxAddr(muxAddr)
-				_, err := netmux.GetRealIP(c.RemoteMultiaddr(), c.LocalMultiaddr(), fport)
-				fmt.Println("??? mux ???", c.LocalMultiaddr(), c.RemoteMultiaddr(), err)
-			} else if _, ok := ipmap[rip]; !ok {
+				rip, err = netmux.GetRealIP(c.RemoteMultiaddr(), c.LocalMultiaddr(), fport)
+			}
+			if _, ok := ipmap[rip]; !ok && err == nil {
 				// 将公网 ip 加入 地址列表, 只处理 tcp4 和 mux 协议
 				/*
 					/ip4/169.254.115.102/tcp/10001
@@ -331,7 +331,7 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 				for port, proto := range portmap {
 					raddr := fmt.Sprintf("/ip4/%s/%s/%s", rip, proto, port)
 					mraddr, err := ma.NewMultiaddr(raddr)
-					fmt.Println("idservice-rip >>", err, raddr)
+					fmt.Println("idservice-set-realip >>", err, raddr)
 					if err == nil {
 						lmaddrs = append(lmaddrs, mraddr)
 					}
