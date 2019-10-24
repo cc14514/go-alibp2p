@@ -9,14 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
-	lru "github.com/hashicorp/golang-lru"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	ma "github.com/multiformats/go-multiaddr"
 	"io/ioutil"
@@ -27,22 +25,18 @@ import (
 	"sync"
 )
 
-const (
-	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
-	NamespaceDHT                      = "cc14514"
-	defConnLow, defConnHi             = 50, 500
-	PSK_TMP                           = `/key/swarm/psk/1.0.0/
-/base16/
-%s`
-)
-
-const (
-	CONNT_TYPE_DIRECT ConnType = iota
-	CONN_TYPE_RELAY
-	CONN_TYPE_ALL
-)
-
 type (
+	Config struct {
+		Ctx                   context.Context
+		Homedir               string
+		Port, ConnLow, ConnHi uint64
+		Bootnodes             []string
+		Discover              bool
+		Networkid, MuxPort    *big.Int
+
+		PrivKey *ecdsa.PrivateKey
+	}
+
 	Service struct {
 		ctx        context.Context
 		homedir    string
@@ -59,13 +53,6 @@ type (
 
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
 func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
-
-var (
-	pubkeyCache, _          = lru.New(10000)
-	loopboot, loopbootstrap int32
-	DefaultProtocols        = []protocol.ID{ProtocolDHT}
-	curve                   = btcec.S256()
-)
 
 // private funcs
 var (
@@ -97,7 +84,7 @@ var (
 			panic(err)
 		}
 		priv1 := new(ecdsa.PrivateKey)
-		priv1.X, priv1.Y, priv1.D, priv1.Curve = arr1[0], arr1[1], arr1[2], curve
+		priv1.X, priv1.Y, priv1.D, priv1.Curve = arr1[0], arr1[1], arr1[2], btcec.S256()
 		priv2 := (*crypto.Secp256k1PrivateKey)(priv1)
 		priv3 := (crypto.PrivKey)(priv2)
 		return priv3, err

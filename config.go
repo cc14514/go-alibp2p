@@ -1,29 +1,37 @@
 package alibp2p
 
 import (
-	"context"
-	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	apnet "github.com/libp2p/go-libp2p-pnet"
 	"strings"
-
-	"math/big"
 )
 
-type Config struct {
-	Ctx                   context.Context
-	Homedir               string
-	Port, ConnLow, ConnHi uint64
-	Bootnodes             []string
-	Discover              bool
-	Networkid, MuxPort    *big.Int
+const (
+	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
+	NamespaceDHT                      = "cc14514"
+	defConnLow, defConnHi             = 50, 500
+	PSK_TMP                           = `/key/swarm/psk/1.0.0/
+/base16/
+%s`
+)
 
-	PrivKey *ecdsa.PrivateKey
-}
+const (
+	CONNT_TYPE_DIRECT ConnType = iota
+	CONN_TYPE_RELAY
+	CONN_TYPE_ALL
+)
+
+var (
+	pubkeyCache, _          = lru.New(10000)
+	DefaultProtocols        = []protocol.ID{ProtocolDHT}
+	loopboot, loopbootstrap int32
+)
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 	if cfg.Networkid != nil {
