@@ -15,15 +15,14 @@ import (
 )
 
 type Config struct {
-	//ctx context.Context, homedir string, port int, bootnodes []string
-	Ctx       context.Context
-	Homedir   string
-	Port      uint64
-	Bootnodes []string
-	Discover  bool
-	Networkid *big.Int
-	MuxPort   *big.Int
-	PrivKey   *ecdsa.PrivateKey
+	Ctx                   context.Context
+	Homedir               string
+	Port, ConnLow, ConnHi uint64
+	Bootnodes             []string
+	Discover              bool
+	Networkid, MuxPort    *big.Int
+
+	PrivKey *ecdsa.PrivateKey
 }
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
@@ -31,10 +30,7 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 		s := sha256.New()
 		s.Write(cfg.Networkid.Bytes())
 		k := s.Sum(nil)
-		tmp := `/key/swarm/psk/1.0.0/
-/base16/
-%s`
-		key := fmt.Sprintf(tmp, hex.EncodeToString(k))
+		key := fmt.Sprintf(PSK_TMP, hex.EncodeToString(k))
 		r := strings.NewReader(key)
 		p, err := apnet.NewProtector(r)
 		if err != nil {
@@ -44,17 +40,3 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 	}
 	return nil, errors.New("disable psk")
 }
-
-/*
-func NewProtector() (ipnet.Protector, error) {
-	if NetworkID == "" {
-		return nil, errors.New("protector disable.")
-	}
-	tmp := `/key/swarm/psk/1.0.0/
-/base16/
-%s`
-	key := fmt.Sprintf(tmp, NetworkID)
-	r := strings.NewReader(key)
-	return pnet.NewProtector(r)
-}
-*/
