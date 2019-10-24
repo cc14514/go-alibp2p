@@ -208,5 +208,15 @@ var (
 	PutBuf = func(buf []byte) {
 		pool.Put(buf)
 	}
+	Spawn = func(size int, fn func(int)) *sync.WaitGroup {
+		wg := new(sync.WaitGroup)
+		for i := 0; i < size; i++ {
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+				fn(i)
+			}()
+		}
+		return wg
+	}
 )
-

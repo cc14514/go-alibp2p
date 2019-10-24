@@ -199,8 +199,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		return nil, err
 	}
 
-	for i, maddr := range cfg.ListenAddrs {
-		fmt.Println(">>>>>>>>>>>", i, maddr)
+	for _, maddr := range cfg.ListenAddrs {
 		if muxTransport.CanDial(maddr) {
 			muxAddr = maddr
 		} else {
@@ -224,8 +223,6 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 
 	// add by liangc
 	if muxAddr != nil {
-		list, err := tcpTransport.GetListen()
-		fmt.Println("<><><><>", list, err, muxAddr)
 		if err := h.Network().Listen(muxAddr); err != nil {
 			h.Close()
 			return nil, err

@@ -231,6 +231,30 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 	return peerid, s, err
 }
 
+func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
+	id, err := peer.IDFromPublicKey(ecdsaToPubkey(pubkey))
+	if err != nil {
+		log.Println("PreConnect-error-1", "id", id.Pretty(), "err", err)
+		return err
+	}
+	_, err = self.Findpeer(id.Pretty())
+	if err != nil {
+		log.Println("PreConnect-error-2", "id", id.Pretty(), "err", err)
+		return err
+	}
+	log.Println("PreConnect-success : protected", "id", id.Pretty())
+	self.host.ConnManager().Protect(id, "pre")
+	go func(ctx context.Context, id peer.ID) {
+		select {
+		case <-time.After(peerstore.TempAddrTTL):
+			ok := self.host.ConnManager().Unprotect(id, "pre")
+			log.Println("PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
+		case <-ctx.Done():
+		}
+	}(self.ctx, id)
+	return nil
+}
+
 func (self *Service) OnConnected(t ConnType, callback func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
 
