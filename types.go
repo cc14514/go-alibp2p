@@ -168,14 +168,17 @@ var (
 		k0 := (*crypto.Secp256k1PublicKey)(pk)
 		return k0
 	}
-	id2pubkey = func(id peer.ID) crypto.PubKey {
+	id2pubkey = func(id peer.ID) (crypto.PubKey, error) {
 		v, ok := pubkeyCache.Get(id)
 		if ok {
-			return v.(crypto.PubKey)
+			return v.(crypto.PubKey), nil
 		}
-		k, _ := id.ExtractPublicKey()
+		k, err := id.ExtractPublicKey()
+		if err != nil {
+			return nil, err
+		}
 		pubkeyCache.Add(id, k)
-		return k
+		return k, nil
 	}
 	randPeers = func(others []peer.AddrInfo, limit int) []peer.AddrInfo {
 		_, randk, _ := crypto.GenerateRSAKeyPair(1024, rand.Reader)
@@ -198,7 +201,10 @@ var (
 		if err != nil {
 			return nil, err
 		}
-		pub := id2pubkey(id)
+		pub, err := id2pubkey(id)
+		if err != nil {
+			return nil, err
+		}
 		return pubkeyToEcdsa(pub), nil
 	}
 
@@ -211,8 +217,8 @@ var (
 	Spawn = func(size int, fn func(int)) *sync.WaitGroup {
 		wg := new(sync.WaitGroup)
 		for i := 0; i < size; i++ {
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				defer wg.Done()
 				fn(i)
 			}()

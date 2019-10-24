@@ -159,7 +159,11 @@ func (self *Service) SetHandler(pid string, handler func(sessionId string, pubke
 		}()
 		conn := s.Conn()
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		pk := id2pubkey(s.Conn().RemotePeer())
+		pk, err := id2pubkey(s.Conn().RemotePeer())
+		if err != nil {
+			log.Println(err)
+			return
+		}
 		pubkeyToEcdsa(pk)
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
@@ -274,8 +278,8 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 		case CONN_TYPE_ALL:
 		}
 		var (
-			in bool
-			pk = id2pubkey(conn.RemotePeer())
+			in    bool
+			pk, _ = id2pubkey(conn.RemotePeer())
 		)
 		switch conn.Stat().Direction {
 		case network.DirInbound:
@@ -290,7 +294,7 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 
 func (self *Service) OnDisconnected(callback func(sessionId string, pubKey *ecdsa.PublicKey)) {
 	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
-		pk := id2pubkey(conn.RemotePeer())
+		pk, _ := id2pubkey(conn.RemotePeer())
 		for _, c := range i.Conns() {
 			c.RemotePeer()
 		}
