@@ -296,9 +296,15 @@ func MaddrsToPorts(maddrs []ma.Multiaddr) map[string]string {
 			portmap[fmt.Sprintf("%d:%d", fport, tport)] = MuxProtocol.Name
 		} else {
 			p, h, err := manet.DialArgs(maddr)
-			//fmt.Println(err, p, h)
 			if err == nil && strings.Contains(h, ":") {
-				portmap[strings.Split(h, ":")[1]] = p
+				net := p
+				switch p {
+				case "tcp4", "tcp6":
+					net = "tcp"
+				case "udp4", "udp6":
+					net = "udp"
+				}
+				portmap[strings.Split(h, ":")[1]] = net
 			}
 		}
 	}
@@ -309,7 +315,6 @@ func MaddrsToIps(maddrs []ma.Multiaddr) map[string]string {
 	for _, maddr := range maddrs {
 		if maddr != nil {
 			x, y, e := manet.DialArgs(maddr)
-			//fmt.Println(x, y, e)
 			if e == nil {
 				ipmap[strings.Split(y, ":")[0]] = x
 			}
@@ -328,21 +333,21 @@ func GetRealIP(r, l ma.Multiaddr, muxport int) (string, error) {
 		return "", err
 	}
 	session := fmt.Sprintf("%s%s", strings.Split(a, ":")[1], strings.Split(b, ":")[1])
-	fmt.Println("get-realip-from-netmux", r, l, "session=", session)
+	log.Println("get-realip-from-netmux", "mux", r, "local", l, "session", session)
 
 	url := fmt.Sprintf("http://127.0.0.1:%d/chainmux/realip", muxport)
 	client := &http.Client{}
 	request, _ := http.NewRequest("GET", url, nil)
 	request.Header.Add("sessionid", session)
 	response, err := client.Do(request)
-	fmt.Println("-- get realip --> err", err, request.Header.Get("sessionid"))
+	log.Println("- get realip -> err", err, "sessionid", request.Header.Get("sessionid"))
 	if err != nil {
 		return "", err
 	} else {
 		defer response.Body.Close()
 		data, err := ioutil.ReadAll(response.Body)
 		if response.StatusCode == 200 {
-			fmt.Println("<-- get realip --", err, response.StatusCode, string(data))
+			log.Println("<- get realip -", "err", err, "stateCode", response.StatusCode, "body", string(data))
 			return string(data), nil
 		}
 		return "", fmt.Errorf("get realip fail : statecode %d", response.StatusCode)
