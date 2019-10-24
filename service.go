@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
@@ -52,6 +53,7 @@ func NewService(cfg Config) *Service {
 	if cfg.MuxPort != nil {
 		listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/%d:%d", cfg.MuxPort, cfg.Port))
 		list = append(list, listen1)
+		netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
 	}
 	optlist := []libp2p.Option{
 		libp2p.NATPortMap(),

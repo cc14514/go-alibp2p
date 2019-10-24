@@ -323,6 +323,17 @@ func MaddrsToIps(maddrs []ma.Multiaddr) map[string]string {
 	return ipmap
 }
 
+type muxfn string
+
+const (
+	realip muxfn = "realip"
+	ping         = "ping"
+)
+
+var muxUrl = func(muxport int, fn muxfn) string {
+	return fmt.Sprintf("http://127.0.0.1:%d/chainmux/%s", muxport, fn)
+}
+
 func GetRealIP(r, l ma.Multiaddr, muxport int) (string, error) {
 	_, a, err := manet.DialArgs(r)
 	if err != nil {
@@ -334,8 +345,7 @@ func GetRealIP(r, l ma.Multiaddr, muxport int) (string, error) {
 	}
 	session := fmt.Sprintf("%s%s", strings.Split(a, ":")[1], strings.Split(b, ":")[1])
 	log.Println("get-realip-from-netmux", "mux", r, "local", l, "session", session)
-
-	url := fmt.Sprintf("http://127.0.0.1:%d/chainmux/realip", muxport)
+	url := muxUrl(muxport, realip)
 	client := &http.Client{}
 	request, _ := http.NewRequest("GET", url, nil)
 	request.Header.Add("sessionid", session)
@@ -352,4 +362,31 @@ func GetRealIP(r, l ma.Multiaddr, muxport int) (string, error) {
 		}
 		return "", fmt.Errorf("get realip fail : statecode %d", response.StatusCode)
 	}
+}
+
+func Register(ctx context.Context, muxport, port int) {
+	var (
+		wait       = 10
+		url        = muxUrl(muxport, ping)
+		client     = &http.Client{}
+		request, _ = http.NewRequest("GET", url, nil)
+	)
+	request.Header.Add("k", fmt.Sprintf("conn://localhost:%d", port))
+	request.Header.Add("v", fmt.Sprintf("localhost:%d", port))
+	go func() {
+		for {
+			response, err := client.Do(request)
+			if err != nil && wait < 120 {
+				wait += 1
+			} else if err == nil {
+				wait = 10
+				response.Body.Close()
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Duration(wait) * time.Second):
+			}
+		}
+	}()
 }
