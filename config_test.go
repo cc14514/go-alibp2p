@@ -69,6 +69,14 @@ func TestRand(t *testing.T) {
 		rnBytes, _ := randk.Bytes()
 		n := new(big.Int).Mod(new(big.Int).SetBytes(rnBytes), big.NewInt(int64(total))).Int64()
 		tasks = append(tasks[n:], tasks[:n]...)
-		fmt.Println("-->", total, limit, n, tasks[:limit],tasks[:], len(tasks))
+		fmt.Println("-->", total, limit, n, tasks[:limit], tasks[:], len(tasks))
 	}
+}
+
+func TestCmp(t *testing.T) {
+	c := big.NewInt(8)
+	i := big.NewInt(1)
+	t.Log(c.Cmp(i))
+	m := map[interface{}]interface{}{1: 1, 2: 2, 3: 3}
+	t.Log(len(m))
 }

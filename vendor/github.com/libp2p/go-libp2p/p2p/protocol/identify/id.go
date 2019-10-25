@@ -270,7 +270,7 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	// mes.ListenAddrs
 	laddrs := mes.GetListenAddrs()
 	lmaddrs := make([]ma.Multiaddr, 0, len(laddrs))
-	containsPubaddr := false
+	//containsPubaddr := false
 	for _, addr := range laddrs {
 		maddr, err := ma.NewMultiaddrBytes(addr)
 		if err != nil {
@@ -278,17 +278,20 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 				p, c.RemoteMultiaddr())
 			continue
 		}
-		if maddr == c.RemoteMultiaddr() {
-			containsPubaddr = true
+		if strings.Contains(maddr.String(), "127.0.0.1") || strings.Contains(maddr.String(), "localhost") {
+			continue
 		}
+		//if maddr == c.RemoteMultiaddr() {
+		//	containsPubaddr = true
+		//}
 		lmaddrs = append(lmaddrs, maddr)
 	}
 	// add by liangc >>
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + p.Pretty())
 	lmaddrs = append(lmaddrs, raddr)
-	if !containsPubaddr {
-		lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
-	}
+	//if !containsPubaddr {
+	//	lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
+	//}
 
 	isRelay := strings.Contains(c.RemoteMultiaddr().String(), "/p2p-circuit")
 	ipmap := netmux.MaddrsToIps(lmaddrs)

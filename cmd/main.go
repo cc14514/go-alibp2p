@@ -212,7 +212,7 @@ var (
 
 func watchpeer() {
 
-	p2pservice.OnConnected(alibp2p.CONNT_TYPE_DIRECT, func(inbound bool, session string, pubKey *ecdsa.PublicKey) {
+	p2pservice.OnConnected(alibp2p.CONNT_TYPE_DIRECT, nil, func(inbound bool, session string, pubKey *ecdsa.PublicKey, preRtn []byte) {
 		k, _ := alibp2p.ECDSAPubEncode(pubKey)
 		peermap.Store(k, time.Now())
 		d, r := p2pservice.Conns()
@@ -270,7 +270,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	to := args["to"].(string)
 	msg := args["msg"].(string)
 	fmt.Println(" Echo ==>", to)
-	_s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
+	_, _s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
 	defer func() {
 		if _s != nil {
 			helpers.FullClose(_s)
@@ -391,7 +391,7 @@ func (self *shellservice) Ping(params interface{}) rpcserver.Success {
 		id      = args["id"].(string)
 		buf     = make([]byte, 512)
 	)
-	rw, err := p2pservice.SendMsg(id, pingpid, []byte("ping"))
+	_, rw, err := p2pservice.SendMsg(id, pingpid, []byte("ping"))
 	if err != nil {
 		rtn = err.Error()
 	} else {

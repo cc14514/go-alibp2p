@@ -20,6 +20,7 @@ import (
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
 	"io"
+	"io/ioutil"
 	"log"
 	"strings"
 	"sync/atomic"
@@ -261,9 +262,9 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	return nil
 }
 
-func (self *Service) OnConnected(t ConnType, callback func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)) {
+func (self *Service) OnConnected(t ConnType, preMsg func() (string, []byte), callbackFn func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, preRtn []byte)) {
+	//self.SetStreamHandler()
 	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
-
 		switch t {
 		case CONNT_TYPE_DIRECT:
 			if !self.isDirectFn(conn.RemotePeer().Pretty()) {
@@ -278,8 +279,11 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 		case CONN_TYPE_ALL:
 		}
 		var (
-			in    bool
-			pk, _ = id2pubkey(conn.RemotePeer())
+			in     bool
+			pk, _  = id2pubkey(conn.RemotePeer())
+			sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+			pubkey = pubkeyToEcdsa(pk)
+			preRtn []byte
 		)
 		switch conn.Stat().Direction {
 		case network.DirInbound:
@@ -287,8 +291,19 @@ func (self *Service) OnConnected(t ConnType, callback func(inbound bool, session
 		case network.DirOutbound:
 			in = false
 		}
-		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		callback(in, sid, pubkeyToEcdsa(pk))
+		// 连出去的，并且 preMsg 有值，就给对方发消息
+		if !in && preMsg != nil {
+			proto, pkg := preMsg()
+			_, s, err := self.SendMsg(conn.RemotePeer().Pretty(), proto, pkg)
+			if err == nil {
+				defer helpers.FullClose(s)
+				buf, err := ioutil.ReadAll(s)
+				if err == nil {
+					preRtn = buf
+				}
+			}
+		}
+		callbackFn(in, sid, pubkey, preRtn)
 	}
 }
 
