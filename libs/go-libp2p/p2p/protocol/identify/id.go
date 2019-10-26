@@ -289,6 +289,12 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	// add by liangc >>
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + p.Pretty())
 	lmaddrs = append(lmaddrs, raddr)
+
+	fmt.Println(1, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+	for i, maddr := range lmaddrs {
+		fmt.Println(i, maddr)
+	}
+	fmt.Println(1, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
 	//if !containsPubaddr {
 	//	lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
 	//}
@@ -296,9 +302,16 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	isRelay := strings.Contains(c.RemoteMultiaddr().String(), "/p2p-circuit")
 	ipmap := netmux.MaddrsToIps(lmaddrs)
 	portmap := netmux.MaddrsToPorts(lmaddrs)
+	muxAddr, localMux := netmux.MuxAddress(ids.Host.Addrs())
+	fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+	fmt.Println("isRelay", isRelay)
+	fmt.Println("ipmap", ipmap)
+	fmt.Println("portmap", portmap)
+	fmt.Println("muxAddr", muxAddr)
+	fmt.Println("localMux", localMux)
+	fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
 
 	if !isRelay {
-		muxAddr, localMux := netmux.MuxAddress(ids.Host.Addrs())
 		//fmt.Println("> ipmap", ipmap)
 		//fmt.Println("> portmap", portmap)
 		//fmt.Println("> localMux", localMux, muxAddr)
@@ -321,17 +334,24 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 					/ip4/169.254.115.102/tcp/10001
 					/ip4/127.0.0.1/mux/5978:10001
 				*/
+				fmt.Println(3, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
 				for port, proto := range portmap {
 					raddr := fmt.Sprintf("/ip4/%s/%s/%s", rip, proto, port)
 					mraddr, err := ma.NewMultiaddr(raddr)
-					//fmt.Println("idservice-set-realip >>", err, raddr)
+					fmt.Println("idservice-set-realip", err, raddr)
 					if err == nil {
 						lmaddrs = append(lmaddrs, mraddr)
 					}
 				}
+				fmt.Println(3, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
 			}
 		}
 	}
+	fmt.Println(4, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+	for i, maddr := range lmaddrs {
+		fmt.Println(i, maddr)
+	}
+	fmt.Println(4, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
 	// add by liangc <<
 
 	// NOTE: Do not add `c.RemoteMultiaddr()` to the peerstore if the remote
