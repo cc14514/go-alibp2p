@@ -13,6 +13,7 @@ import (
 	"github.com/cc14514/go-lightrpc/rpcserver"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli"
 	"io"
 	"io/ioutil"
@@ -263,6 +264,37 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 	}
 }
 
+//http://localhost:8081/api/?body={"service":"shell","method":"conns"}
+func (self *shellservice) Conns(params interface{}) rpcserver.Success {
+	s := time.Now()
+	direct, relay, total := p2pservice.Peers()
+	dpis := make([]peer.AddrInfo, 0)
+	for _, id := range direct {
+		if pi, err := p2pservice.Findpeer(id); err == nil {
+			dpis = append(dpis, pi)
+		}
+	}
+	rpis := make(map[string][]peer.AddrInfo)
+	for rid, ids := range relay {
+		pis := make([]peer.AddrInfo, 0)
+		for _, id := range ids {
+			if pi, err := p2pservice.Findpeer(id); err == nil {
+				pis = append(pis, pi)
+			}
+		}
+		rpis[rid] = pis
+	}
+	return rpcserver.Success{
+		Success: true,
+		Entity: struct {
+			TimeUsed string
+			Total    int
+			Direct   []peer.AddrInfo
+			Relay    map[string][]peer.AddrInfo
+		}{time.Since(s).String(), total, dpis, rpis},
+	}
+}
+
 //http://localhost:8081/api/?body={"service":"shell","method":"echo","params":{"to":"/ip4/127.0.0.1/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP","msg":"hello world"}}
 func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	s := time.Now()
@@ -478,6 +510,9 @@ var (
 	api_peers = func() string {
 		return apiurl(rpcport) + `{"service":"shell","method":"peers"}`
 	}
+	api_conns = func() string {
+		return apiurl(rpcport) + `{"service":"shell","method":"conns"}`
+	}
 	api_myid = func() string {
 		return apiurl(rpcport) + `{"service":"shell","method":"myid"}`
 	}
@@ -608,6 +643,17 @@ var (
 		},
 		"peers": func(args ...string) (interface{}, error) {
 			resp, err := http.Get(api_peers())
+			if err != nil {
+				log.Println("error", err)
+			}
+			if resp != nil && resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			printResp(resp)
+			return nil, nil
+		},
+		"conns": func(args ...string) (interface{}, error) {
+			resp, err := http.Get(api_conns())
 			if err != nil {
 				log.Println("error", err)
 			}
