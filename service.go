@@ -179,15 +179,15 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	id, s, err := self.SendMsg(to, protocolID, msg)
-	if err == nil {
-		self.host.ConnManager().Protect(id, "tmp")
-		defer func() {
+	self.host.ConnManager().Protect(id, "tmp")
+	defer func() {
+		if err == nil && s != nil {
 			if s != nil {
-				helpers.FullClose(s)
+				go helpers.FullClose(s)
 			}
-			self.host.ConnManager().Unprotect(id, "tmp")
-		}()
-	}
+		}
+		self.host.ConnManager().Unprotect(id, "tmp")
+	}()
 	return err
 }
 

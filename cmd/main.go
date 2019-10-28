@@ -169,6 +169,7 @@ func main() {
 			log.Printf("read: total=%d , first 10 : %s , echo-err : %v\n", len(data), data[:p], err)
 		})
 		p2pservice.SetStreamHandler(echopid, func(s network.Stream) {
+			now := time.Now()
 			defer helpers.FullClose(s)
 			from := s.Conn().RemotePeer()
 			log.Println("Got a new stream from ", from.Pretty())
@@ -188,7 +189,7 @@ func main() {
 			}(s); err != nil {
 				fmt.Println("error", err)
 			} else {
-				fmt.Println("Close stream...")
+				fmt.Println("Close stream...","ttl",time.Since(now))
 			}
 		})
 		go p2pservice.Start()
@@ -568,12 +569,13 @@ var (
 		"loopecho": func(args ...string) (interface{}, error) {
 			to, msg, total := args[0], args[1], args[2]
 			c, _ := strconv.Atoi(total)
-			data := make([]byte, 2048)
+			data := make([]byte, 20000)
 			for i := 0; i < len(data); i++ {
 				data[i] = 97
 			}
 
 			for i := 0; i < c; i++ {
+				now := time.Now()
 				copy(data, []byte(fmt.Sprintf("%d-->%s", i, msg))[:])
 				resp, err := http.Get(api_echo(to, string(data)))
 				if err != nil {
@@ -586,7 +588,7 @@ var (
 				success := rpcserver.SuccessFromReader(resp.Body)
 				if success.Success {
 					entity := success.Entity.(map[string]interface{})
-					fmt.Println(i, len(data), "recv-success", len(entity["Data"].(string)))
+					fmt.Println(i, len(data), "recv-success", len(entity["Data"].(string)), "ttl", time.Since(now))
 				} else {
 					fmt.Println(i, len(data), "recv-error", success.Entity)
 				}
