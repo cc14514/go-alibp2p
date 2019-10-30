@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	"math/big"
 	"sync"
+	"time"
 )
 
 type (
@@ -41,10 +42,13 @@ type (
 		args []interface{}
 	}
 	AsyncRunner struct {
+		sync.Mutex
 		wg                *sync.WaitGroup
 		ctx               context.Context
 		counter, min, max int32
 		fnCh              chan *asyncFn
+		closeCh           chan struct{}
 		close             bool
+		gc                time.Duration
 	}
 )

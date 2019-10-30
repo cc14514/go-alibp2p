@@ -31,15 +31,25 @@ func (f *asyncFn) apply(ctx context.Context) {
 
 func NewAsyncRunner(ctx context.Context, min, max int32) *AsyncRunner {
 	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	return &AsyncRunner{
+	o := &AsyncRunner{
 		ctx:     ctx,
 		wg:      wg,
 		counter: 0,
 		min:     min,
 		max:     max,
 		fnCh:    make(chan *asyncFn),
+		closeCh: make(chan struct{}),
+		gc:      5 * time.Second,
 	}
+	wg.Add(1)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-o.closeCh:
+		}
+		wg.Done()
+	}()
+	return o
 }
 
 func (a *AsyncRunner) Size() int32 {
@@ -55,42 +65,52 @@ func (a *AsyncRunner) Wait() {
 	a.wg.Wait()
 }
 
-func (a *AsyncRunner) spawn(fn func(ctx context.Context, args []interface{}), args ...interface{}) {
+func (a *AsyncRunner) spawn(tn int32, fn func(ctx context.Context, args []interface{}), args ...interface{}) {
 	a.wg.Add(1)
-	tn := atomic.AddInt32(&a.counter, 1)
 	go func(tn int32) {
-		defer func() {
-			if atomic.AddInt32(&a.counter, -1) == 0 {
-				a.wg.Done()
-			}
-			a.wg.Done()
-		}()
-		timer := time.NewTimer(5 * time.Second)
+		defer a.wg.Done()
+		timer := time.NewTimer(a.gc)
 		for {
 			select {
 			case fn := <-a.fnCh:
 				fn.apply(context.WithValue(a.ctx, "tn", tn))
 			case <-a.ctx.Done():
+				atomic.AddInt32(&a.counter, -1)
 				return
 			case <-timer.C:
-				if atomic.LoadInt32(&a.counter) > a.min || a.close {
-					fmt.Println("gc", tn)
+				if func() bool {
+					a.Lock()
+					defer a.Unlock()
+					if c := atomic.LoadInt32(&a.counter); c > a.min || a.close {
+						c = atomic.AddInt32(&a.counter, -1)
+						//fmt.Println("<--gc--", "tn", tn, a.close, "min", a.min, "counter", c)
+						if c == 0 {
+							close(a.closeCh)
+						}
+						return true
+					}
+					return false
+				}() {
 					return
 				}
 			}
-			timer.Reset(5 * time.Second)
+			timer.Reset(a.gc)
 		}
 	}(tn)
-
 }
 
 func (a *AsyncRunner) Apply(fn func(ctx context.Context, args []interface{}), args ...interface{}) {
 	select {
 	case a.fnCh <- &asyncFn{fn, args}:
 	default:
-		if atomic.LoadInt32(&a.counter) < a.max {
-			a.spawn(fn, args)
+		//if tn := atomic.AddInt32(&a.counter, 1); tn <= a.max {
+		a.Lock()
+		tn := atomic.LoadInt32(&a.counter) + 1
+		if tn <= a.max {
+			atomic.AddInt32(&a.counter, 1)
+			a.spawn(tn, fn, args)
 		}
+		a.Unlock()
 		a.fnCh <- &asyncFn{fn, args}
 	}
 }

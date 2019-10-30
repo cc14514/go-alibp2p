@@ -23,6 +23,7 @@ package alibp2p
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -42,14 +43,29 @@ func TestAsyncRunner_Apply(t *testing.T) {
 	}()
 
 	go func() {
-		for i := 0; i < 20; i++ {
-			time.Sleep(2 * time.Second)
+		for i := 0; i < 10; i++ {
 			runner.Apply(func(ctx context.Context, args []interface{}) {
 				i := args[0].(int)
-				fmt.Println(ctx.Value("tn"), "BBBBBBBBBB", i, runner.Size())
+				fmt.Println("tn", ctx.Value("tn"), "BBBBBBBBBB", i, "pool-size", runner.Size())
 			}, i)
 		}
+		time.Sleep(3 * time.Second)
+		for i := 0; i < 5; i++ {
+			time.Sleep(1 * time.Second)
+			runner.Apply(func(ctx context.Context, args []interface{}) {
+				i := args[0].(int)
+				fmt.Println("tn", ctx.Value("tn"), "CCCCCCCCC", i, "pool-size", runner.Size())
+			}, i)
+		}
+		time.Sleep(3*time.Second)
 	}()
 	runner.WaitClose()
 	fmt.Println("ttl", time.Since(now), runner.Size())
+}
+
+func TestAtomic(t *testing.T) {
+	var i, j, k int32 = 3, 2, 1
+	fmt.Println(i, j, k)
+	fmt.Println(atomic.CompareAndSwapInt32(&i, i, k))
+	fmt.Println(i, j, k)
 }
