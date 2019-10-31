@@ -244,9 +244,14 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 		log.Println("PreConnect-error-1", "id", id.Pretty(), "err", err)
 		return err
 	}
-	_, err = self.Findpeer(id.Pretty())
+	pi, err := self.Findpeer(id.Pretty())
 	if err != nil {
 		log.Println("PreConnect-error-2", "id", id.Pretty(), "err", err)
+		return err
+	}
+	err = connectFn(self.ctx, self.host, []peer.AddrInfo{pi})
+	if err != nil {
+		log.Println("PreConnect-error-3", "id", id.Pretty(), "err", err)
 		return err
 	}
 	log.Println("PreConnect-success : protected", "id", id.Pretty())
