@@ -299,17 +299,26 @@ func (self *Service) OnConnected(t ConnType, preMsg func() (string, []byte), cal
 		// 连出去的，并且 preMsg 有值，就给对方发消息
 		if !in && preMsg != nil {
 			proto, pkg := preMsg()
-			_, s, err := self.SendMsg(conn.RemotePeer().Pretty(), proto, pkg)
+			resp, err := self.Request(conn.RemotePeer().Pretty(), proto, pkg)
 			if err == nil {
-				defer helpers.FullClose(s)
-				buf, err := ioutil.ReadAll(s)
-				if err == nil {
-					preRtn = buf
-				}
+				preRtn = resp
 			}
 		}
 		callbackFn(in, sid, pubkey, preRtn)
 	}
+}
+
+func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
+	_, s, err := self.SendMsg(to, proto, pkg)
+	if err == nil {
+		s.SetDeadline(time.Now().Add(10 * time.Second))
+		defer helpers.FullClose(s)
+		buf, err := ioutil.ReadAll(s)
+		if err == nil {
+			return buf, nil
+		}
+	}
+	return nil, err
 }
 
 func (self *Service) OnDisconnected(callback func(sessionId string, pubKey *ecdsa.PublicKey)) {
