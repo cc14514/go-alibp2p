@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +32,7 @@ const (
 	version = "0.0.1-191009001"
 	echopid = "/echo/1.0.0"
 	pingpid = "/ping/1.0.0"
+	pongpid = "/pong/1.0.0"
 	msgpid  = "/msg/1.0.0"
 )
 
@@ -47,6 +49,29 @@ var (
 			Version:   version,
 			Service:   service,
 		}
+	}
+
+	packetHeadEncode = func(msgType uint16, data []byte) []byte {
+		var psize = uint32(len(data))
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.BigEndian, &msgType)
+		binary.Write(buf, binary.BigEndian, &psize)
+		return buf.Bytes()
+	}
+
+	packetHeadDecode = func(header []byte) (msgType uint16, size uint32, err error) {
+		if len(header) != 6 {
+			err = errors.New("error_header")
+			return
+		}
+		msgTypeR := bytes.NewReader(header[:2])
+		err = binary.Read(msgTypeR, binary.BigEndian, &msgType)
+		if err != nil {
+			return
+		}
+		sizeR := bytes.NewReader(header[2:])
+		err = binary.Read(sizeR, binary.BigEndian, &size)
+		return
 	}
 )
 
@@ -139,19 +164,44 @@ func main() {
 		watchpeer()
 		p2pservice.SetHandler(pingpid, func(session string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error {
 			log.Println("ping msg from", pubkey, session)
-			buf := make([]byte, 4)
-			t, err := rw.Read(buf)
+			head := make([]byte, 6)
+			t, err := rw.Read(head)
+			if t != 6 || err != nil {
+				return err
+			}
+			msgtype, size, err := packetHeadDecode(head)
 			if err != nil {
 				return err
 			}
-			if bytes.Equal(buf[:t], []byte("ping")) {
-				rw.Write([]byte("pong"))
-			} else {
-				err = errors.New("error_msg")
-				rw.Write([]byte(err.Error()))
+			buf := make([]byte, size)
+			t, err = io.ReadFull(rw, buf)
+			if err != nil {
 				return err
 			}
-			return nil
+			log.Println("ping msg", "msgtype", msgtype, "size", size)
+			resp := big.NewInt(int64(size))
+			resphead := packetHeadEncode(2, resp.Bytes())
+			to, _ := alibp2p.ECDSAPubEncode(pubkey)
+			_, _, err = p2pservice.SendMsg(to, pongpid, append(resphead, resp.Bytes()...))
+			return err
+		})
+		p2pservice.SetHandler(pongpid, func(session string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error {
+			log.Println("pong msg from", pubkey, session)
+			head := make([]byte, 6)
+			t, err := rw.Read(head)
+			if t != 6 || err != nil {
+				return err
+			}
+			msgtype, size, err := packetHeadDecode(head)
+
+			buf := make([]byte, size)
+			_, err = io.ReadFull(rw, buf)
+			if err != nil {
+				return err
+			}
+			respsize := new(big.Int).SetBytes(buf)
+			log.Println("pong msg", "msgtype", msgtype, "szie", respsize, err)
+			return err
 		})
 
 		p2pservice.SetStreamHandler("echo", func(s network.Stream) {
@@ -189,7 +239,7 @@ func main() {
 			}(s); err != nil {
 				fmt.Println("error", err)
 			} else {
-				fmt.Println("Close stream...","ttl",time.Since(now))
+				fmt.Println("Close stream...", "ttl", time.Since(now))
 			}
 		})
 		go p2pservice.Start()
@@ -301,12 +351,17 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	s := time.Now()
 	args := params.(map[string]interface{})
 	to := args["to"].(string)
-	msg := args["msg"].(string)
-	fmt.Println(" Echo ==>", to)
-	_, _s, err := p2pservice.SendMsg(to, echopid, []byte(msg+"\n"))
+	size := args["msg"].(string)
+	msg, err := strconv.Atoi(size)
+	fmt.Println(" Echo ==>", "to", to, "size", msg, err)
+	data := make([]byte, msg)
+	for i := 0; i < msg; i++ {
+		data[i] = 'e'
+	}
+	_, _s, err := p2pservice.SendMsg(to, echopid, append(data, []byte("\n")...))
 	defer func() {
 		if _s != nil {
-			helpers.FullClose(_s)
+			go helpers.FullClose(_s)
 		}
 	}()
 	rtn := ""
@@ -324,7 +379,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	}
 	return rpcserver.Success{
 		Success: success,
-		Entity:  apiret{time.Since(s).String(), rtn},
+		Entity:  apiret{time.Since(s).String(), len(rtn)},
 	}
 }
 
@@ -422,18 +477,23 @@ func (self *shellservice) Ping(params interface{}) rpcserver.Success {
 		success = false
 		args    = params.(map[string]interface{})
 		id      = args["id"].(string)
-		buf     = make([]byte, 512)
+		ssize   = args["size"].(string)
 	)
-	_, rw, err := p2pservice.SendMsg(id, pingpid, []byte("ping"))
+
+	size, _ := strconv.Atoi(ssize)
+
+	data := make([]byte, size)
+	for i := 0; i < size; i++ {
+		data[i] = 'p'
+	}
+	h := packetHeadEncode(1, data)
+	p := append(h, data...)
+	_, _, err := p2pservice.SendMsg(id, pingpid, p)
 	if err != nil {
 		rtn = err.Error()
 	} else {
-		t, err := rw.Read(buf)
-		if err != nil {
-			rtn = err.Error()
-		}
-		rtn = string(buf[:t])
 		success = true
+		rtn = id
 	}
 	entity := apiret{time.Since(s).String(), rtn}
 	p2pservice.PutPeerMeta(id, "ping", entity)
@@ -505,8 +565,8 @@ var (
 	api_findpeer = func(k string) string {
 		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"findpeer","params":{"id":"%s"}}`, k)
 	}
-	api_ping = func(k string) string {
-		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"ping","params":{"id":"%s"}}`, k)
+	api_ping = func(k, size string) string {
+		return apiurl(rpcport) + fmt.Sprintf(`{"service":"shell","method":"ping","params":{"id":"%s","size":"%s"}}`, k, size)
 	}
 	api_peers = func() string {
 		return apiurl(rpcport) + `{"service":"shell","method":"peers"}`
@@ -633,7 +693,8 @@ var (
 		},
 		"ping": func(args ...string) (interface{}, error) {
 			k := args[0]
-			resp, err := http.Get(api_ping(k))
+			size := args[1]
+			resp, err := http.Get(api_ping(k, size))
 			if err != nil {
 				log.Println("error", err)
 			}

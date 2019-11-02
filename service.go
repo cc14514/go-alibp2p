@@ -155,7 +155,7 @@ func (self *Service) SetHandler(pid string, handler func(sessionId string, pubke
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		defer func() {
 			if s != nil {
-				helpers.FullClose(s)
+				go helpers.FullClose(s)
 			}
 		}()
 		conn := s.Conn()
