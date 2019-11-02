@@ -488,7 +488,7 @@ func (self *shellservice) Ping(params interface{}) rpcserver.Success {
 	}
 	h := packetHeadEncode(1, data)
 	p := append(h, data...)
-	_, _, err := p2pservice.SendMsg(id, pingpid, p)
+	err := p2pservice.SendMsgAfterClose(id, pingpid, p)
 	if err != nil {
 		rtn = err.Error()
 	} else {
