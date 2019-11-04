@@ -183,6 +183,7 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	defer func() {
 		if err == nil && s != nil {
 			if s != nil {
+				log.Println("SendMsgAfterClose-end", "to", to, "protoid", protocolID, "head", msg[:6])
 				go helpers.FullClose(s)
 			}
 		}
@@ -302,6 +303,8 @@ func (self *Service) OnConnected(t ConnType, preMsg func() (string, []byte), cal
 			resp, err := self.Request(conn.RemotePeer().Pretty(), proto, pkg)
 			if err == nil {
 				preRtn = resp
+			} else {
+				preRtn = []byte(err.Error())
 			}
 		}
 		callbackFn(in, sid, pubkey, preRtn)
@@ -422,6 +425,7 @@ func (self *Service) Get(k string) ([]byte, error) {
 }
 
 func (self *Service) BootstrapOnce() error {
+	connectFn(self.ctx, self.host, self.bootnodes)
 	err := self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
 	if err != nil {
 		log.Println("bootstrap-error", "err", err)
@@ -430,11 +434,15 @@ func (self *Service) BootstrapOnce() error {
 }
 
 func (self *Service) bootstrap() error {
+	period := uint64(5)
+	if self.cfg.BootstrapPeriod > period {
+		period = self.cfg.BootstrapPeriod
+	}
 	log.Println("host-addrs", self.host.Addrs())
 	log.Println("host-network-listen", self.host.Network().ListenAddresses())
 	log.Println("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
 	go func() {
-		log.Println("loopboot-start")
+		log.Println("loopboot-start", "period", period)
 		if atomic.CompareAndSwapInt32(&loopboot, 0, 1) {
 			defer func() {
 				atomic.StoreInt32(&loopboot, 0)
@@ -444,7 +452,7 @@ func (self *Service) bootstrap() error {
 				select {
 				case <-self.ctx.Done():
 					return
-				case <-time.After(5 * time.Second):
+				case <-time.After(time.Duration(period) * time.Second):
 					if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
 						// 在 peerstore 中随机找至多 5 个节点尝试连接
 						var (

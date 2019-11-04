@@ -14,12 +14,12 @@ import (
 
 type (
 	Config struct {
-		Ctx                   context.Context
-		Homedir               string
-		Port, ConnLow, ConnHi uint64
-		Bootnodes             []string
-		Discover              bool
-		Networkid, MuxPort    *big.Int
+		Ctx                                    context.Context
+		Homedir                                string
+		Port, ConnLow, ConnHi, BootstrapPeriod uint64
+		Bootnodes                              []string
+		Discover                               bool
+		Networkid, MuxPort                     *big.Int
 
 		PrivKey *ecdsa.PrivateKey
 	}
