@@ -182,7 +182,7 @@ func main() {
 			resp := big.NewInt(int64(size))
 			resphead := packetHeadEncode(2, resp.Bytes())
 			to, _ := alibp2p.ECDSAPubEncode(pubkey)
-			_, _, err = p2pservice.SendMsg(to, pongpid, append(resphead, resp.Bytes()...))
+			_, _, _, err = p2pservice.SendMsg(to, pongpid, append(resphead, resp.Bytes()...))
 			return err
 		})
 		p2pservice.SetHandler(pongpid, func(session string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error {
@@ -358,7 +358,7 @@ func (self *shellservice) Echo(params interface{}) rpcserver.Success {
 	for i := 0; i < msg; i++ {
 		data[i] = 'e'
 	}
-	_, _s, err := p2pservice.SendMsg(to, echopid, append(data, []byte("\n")...))
+	_, _s, _, err := p2pservice.SendMsg(to, echopid, append(data, []byte("\n")...))
 	defer func() {
 		if _s != nil {
 			go helpers.FullClose(_s)

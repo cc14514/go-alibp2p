@@ -80,6 +80,7 @@ func NewService(cfg Config) *Service {
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
 	}
+	optlist = append(optlist, cfg.MuxTransportOption())
 
 	host, err := libp2p.New(cfg.Ctx, optlist...)
 	if err != nil {
@@ -178,12 +179,20 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
-	id, s, err := self.SendMsg(to, protocolID, msg)
+	id, s, _, err := self.SendMsg(to, protocolID, msg)
 	self.host.ConnManager().Protect(id, "tmp")
 	defer func() {
 		if err == nil && s != nil {
 			if s != nil {
-				log.Println("SendMsgAfterClose-end", "to", to, "protoid", protocolID, "head", msg[:6])
+				/*
+				var head []byte
+				if len(msg) > 6 {
+					head = msg[:6]
+				} else {
+					head = msg
+				}
+				log.Println("SendMsgAfterClose-end", "to", to, "protoid", protocolID, "head", head, "n", n)
+				*/
 				go helpers.FullClose(s)
 			}
 		}
@@ -192,24 +201,24 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	return err
 }
 
-func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, error) {
+func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
 	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
 		if err != nil {
 			log.Println(err)
-			return peerid, nil, err
+			return peerid, nil, 0, err
 		}
 
 		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
 		if err != nil {
 			log.Println(err)
-			return peerid, nil, err
+			return peerid, nil, 0, err
 		}
 		peerid, err = peer.IDB58Decode(pid)
 		if err != nil {
 			log.Println(err)
-			return peerid, nil, err
+			return peerid, nil, 0, err
 		}
 		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
 		targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
@@ -220,7 +229,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 		pi, err := self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
 			log.Println(err)
-			return peerid, nil, err
+			return peerid, nil, 0, err
 		}
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	}
@@ -229,14 +238,15 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 
 	if err != nil {
 		log.Println(err)
-		return peerid, nil, err
+		return peerid, nil, 0, err
 	}
-	_, err = s.Write(msg)
+	var total int
+	total, err = s.Write(msg)
 	if err != nil {
 		log.Println(err)
-		return peerid, nil, err
+		return peerid, nil, total, err
 	}
-	return peerid, s, err
+	return peerid, s, total, err
 }
 
 func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
@@ -312,7 +322,7 @@ func (self *Service) OnConnected(t ConnType, preMsg func() (string, []byte), cal
 }
 
 func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
-	_, s, err := self.SendMsg(to, proto, pkg)
+	_, s, _, err := self.SendMsg(to, proto, pkg)
 	if err == nil {
 		s.SetDeadline(time.Now().Add(10 * time.Second))
 		defer helpers.FullClose(s)

@@ -8,8 +8,12 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	mplex "github.com/libp2p/go-libp2p-mplex"
 	apnet "github.com/libp2p/go-libp2p-pnet"
+	yamux "github.com/libp2p/go-libp2p-yamux"
+	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -47,4 +51,41 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 		return libp2p.PrivateNetwork(p), nil
 	}
 	return nil, errors.New("disable psk")
+}
+
+func (cfg Config) MuxTransportOption() libp2p.Option {
+	/*
+		AcceptBacklog:          256,
+		EnableKeepAlive:        true,
+		KeepAliveInterval:      30 * time.Second,
+		ConnectionWriteTimeout: 10 * time.Second,
+		MaxStreamWindowSize:    initialStreamWindow,
+		LogOutput:              os.Stderr,
+		ReadBufSize:            4096,
+		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
+		WriteCoalesceDelay:     100 * time.Microsecond,
+	*/
+	ymxtpt := &yamux.Transport{
+		//AcceptBacklog:          512,
+		//ConnectionWriteTimeout: time.Second * 30,
+		//KeepAliveInterval:      time.Second * 30,
+		//EnableKeepAlive:        true,
+		//MaxStreamWindowSize:    uint32(1024 * 1024),
+		//LogOutput:              os.Stdout,
+		//LogOutput: ioutil.Discard,
+		AcceptBacklog:          512,
+		EnableKeepAlive:        true,
+		KeepAliveInterval:      45 * time.Second,
+		ConnectionWriteTimeout: 45 * time.Second,
+		MaxStreamWindowSize:    uint32(1024 * 1024),
+		LogOutput:              os.Stderr,
+		ReadBufSize:            4096,
+		MaxMessageSize:         128 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
+		WriteCoalesceDelay:     100 * time.Microsecond,
+	}
+	return libp2p.ChainOptions(
+		libp2p.Muxer("/yamux/1.0.0", ymxtpt),
+		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
+	)
+
 }
