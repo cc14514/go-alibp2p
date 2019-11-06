@@ -7,7 +7,7 @@ github.com/cc14514/go-cookiekit/collections/stack
 github.com/cc14514/go-cookiekit/graph
 # github.com/cc14514/go-lightrpc v0.0.0-20191009082400-f2eba654f95d
 github.com/cc14514/go-lightrpc/rpcserver
-# github.com/cc14514/go-mux-transport v0.0.0-20191106101528-14db6123e8a9 => ./libs/go-mux-transport
+# github.com/cc14514/go-mux-transport v0.0.0-20191106101528-14db6123e8a9
 github.com/cc14514/go-mux-transport
 # github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
