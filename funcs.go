@@ -115,9 +115,6 @@ func (a *AsyncRunner) Apply(fn func(ctx context.Context, args []interface{}), ar
 	}
 }
 
-func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
-func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
-
 // private funcs
 var (
 	loadid = func(homedir string) (crypto.PrivKey, error) {
