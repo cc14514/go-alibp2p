@@ -5,7 +5,6 @@ require (
 	github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb
 	github.com/cc14514/go-lightrpc v0.0.0-20191009082400-f2eba654f95d
 	github.com/cc14514/go-mux-transport v0.0.0-20191106101528-14db6123e8a9
-
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/libp2p/go-buffer-pool v0.0.2
 	github.com/libp2p/go-libp2p v0.1.0
@@ -18,6 +17,7 @@ require (
 	github.com/libp2p/go-libp2p-yamux v0.2.0
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/urfave/cli v1.22.1
+	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951 // indirect
 
 )
