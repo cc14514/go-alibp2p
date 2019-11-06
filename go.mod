@@ -17,8 +17,8 @@ require (
 	github.com/libp2p/go-libp2p-yamux v0.2.0
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/urfave/cli v1.22.1
+	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
 	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951 // indirect
-
 )
 
 go 1.13

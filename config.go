@@ -54,25 +54,7 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 }
 
 func (cfg Config) MuxTransportOption() libp2p.Option {
-	/*
-		AcceptBacklog:          256,
-		EnableKeepAlive:        true,
-		KeepAliveInterval:      30 * time.Second,
-		ConnectionWriteTimeout: 10 * time.Second,
-		MaxStreamWindowSize:    initialStreamWindow,
-		LogOutput:              os.Stderr,
-		ReadBufSize:            4096,
-		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
-		WriteCoalesceDelay:     100 * time.Microsecond,
-	*/
 	ymxtpt := &yamux.Transport{
-		//AcceptBacklog:          512,
-		//ConnectionWriteTimeout: time.Second * 30,
-		//KeepAliveInterval:      time.Second * 30,
-		//EnableKeepAlive:        true,
-		//MaxStreamWindowSize:    uint32(1024 * 1024),
-		//LogOutput:              os.Stdout,
-		//LogOutput: ioutil.Discard,
 		AcceptBacklog:          512,
 		EnableKeepAlive:        true,
 		KeepAliveInterval:      45 * time.Second,

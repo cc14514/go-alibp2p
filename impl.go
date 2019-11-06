@@ -19,6 +19,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
+	"golang.org/x/xerrors"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -69,7 +70,7 @@ func NewService(cfg Config) Alibp2pService {
 					opts.NamespacedValidator(NamespaceDHT, blankValidator{}),
 					opts.Protocols(DefaultProtocols...))
 				if err != nil {
-					panic(err)
+					panic(xerrors.Errorf("dht : %w", err))
 				}
 				router = dht
 			}
