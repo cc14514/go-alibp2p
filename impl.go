@@ -243,7 +243,7 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 		log.Println("PreConnect-error-1", "id", id.Pretty(), "err", err)
 		return err
 	}
-	pi, err := self.Findpeer(id.Pretty())
+	pi, err := self.findpeer(id.Pretty())
 	if err != nil {
 		log.Println("PreConnect-error-2", "id", id.Pretty(), "err", err)
 		return err
@@ -406,12 +406,28 @@ func (self *Service) GetPeerMeta(id, key string) (interface{}, error) {
 	return self.host.Peerstore().Get(p, key)
 }
 
-func (self *Service) Findpeer(id string) (peer.AddrInfo, error) {
+func (self *Service) Findpeer(id string) ([]string, error) {
+	pi, err := self.findpeer(id)
+	if err != nil {
+		return nil, err
+	}
+	addrs := make([]string, 0)
+	for _, addr := range pi.Addrs {
+		addrs = append(addrs, addr.String())
+	}
+	return addrs, nil
+}
+
+func (self *Service) findpeer(id string) (peer.AddrInfo, error) {
 	peerid, err := peer.IDB58Decode(id)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
-	return self.router.FindPeer(self.ctx, peerid)
+	pi, err := self.router.FindPeer(self.ctx, peerid)
+	if err != nil {
+		return pi, err
+	}
+	return pi, nil
 }
 
 func (self *Service) Put(k string, v []byte) error {

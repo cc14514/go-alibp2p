@@ -4,7 +4,7 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
 	github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb
 	github.com/cc14514/go-lightrpc v0.0.0-20191009082400-f2eba654f95d
-	github.com/cc14514/go-mux-transport v0.0.0-20191022083255-64706914fab5
+	github.com/cc14514/go-mux-transport v0.0.0-20191024085632-4e07b9546e39
 
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/libp2p/go-buffer-pool v0.0.2

@@ -60,12 +60,11 @@ type (
 		PutPeerMeta(id, key string, v interface{}) error
 		GetPeerMeta(id, key string) (interface{}, error)
 
-		Findpeer(id string) (peer.AddrInfo, error)
+		Findpeer(id string) ([]string, error) // return addrs,err
 
 		BootstrapOnce() error
 
 		Put(k string, v []byte) error
 		Get(k string) ([]byte, error)
 	}
-
 )
