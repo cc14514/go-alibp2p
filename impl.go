@@ -19,7 +19,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
-	"io"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -27,7 +26,7 @@ import (
 	"time"
 )
 
-func NewService(cfg Config) *Service {
+func NewService(cfg Config) Alibp2pService {
 	log.Println("alibp2p.NewService", cfg)
 	var (
 		err             error
@@ -141,18 +140,16 @@ func (self *Service) SetBootnode(peer ...string) error {
 	return err
 }
 
-func (self *Service) Myid() map[string]interface{} {
-	addrs := make([]string, 0)
+func (self *Service) Myid() (id string, addrs []string) {
+	id = self.host.ID().Pretty()
+	addrs = make([]string, 0)
 	for _, maddr := range self.host.Addrs() {
 		addrs = append(addrs, maddr.String())
 	}
-	return map[string]interface{}{
-		"Id":    self.host.ID().Pretty(),
-		"Addrs": addrs,
-	}
+	return
 }
 
-func (self *Service) SetHandler(pid string, handler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error) {
+func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		defer func() {
 			if s != nil {
@@ -184,15 +181,6 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	defer func() {
 		if err == nil && s != nil {
 			if s != nil {
-				/*
-				var head []byte
-				if len(msg) > 6 {
-					head = msg[:6]
-				} else {
-					head = msg
-				}
-				log.Println("SendMsgAfterClose-end", "to", to, "protoid", protocolID, "head", head, "n", n)
-				*/
 				go helpers.FullClose(s)
 			}
 		}
@@ -278,7 +266,7 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	return nil
 }
 
-func (self *Service) OnConnected(t ConnType, preMsg func() (string, []byte), callbackFn func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, preRtn []byte)) {
+func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEvent) {
 	//self.SetStreamHandler()
 	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
 		switch t {
@@ -334,7 +322,7 @@ func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
 	return nil, err
 }
 
-func (self *Service) OnDisconnected(callback func(sessionId string, pubKey *ecdsa.PublicKey)) {
+func (self *Service) OnDisconnected(callback DisconnectEvent) {
 	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
 		pk, _ := id2pubkey(conn.RemotePeer())
 		for _, c := range i.Conns() {

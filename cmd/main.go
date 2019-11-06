@@ -41,7 +41,7 @@ var (
 	homedir, bootnodes                string
 	port, networkid, rpcport, muxport int
 	nodiscover                        bool
-	p2pservice                        *alibp2p.Service
+	p2pservice                        alibp2p.Libp2pService
 	ServiceRegMap                     = make(map[string]rpcserver.ServiceReg)
 	genServiceReg                     = func(namespace, version string, service interface{}) {
 		ServiceRegMap[namespace] = rpcserver.ServiceReg{
@@ -160,7 +160,9 @@ func main() {
 		if muxport > 0 {
 			cfg.MuxPort = big.NewInt(int64(muxport))
 		}
-		p2pservice = alibp2p.NewService(cfg)
+		a := alibp2p.NewService(cfg)
+		b := a.(*alibp2p.Service)
+		p2pservice = b
 		watchpeer()
 		p2pservice.SetHandler(pingpid, func(session string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error {
 			log.Println("ping msg from", pubkey, session)
@@ -421,7 +423,10 @@ func (self *shellservice) Get(params interface{}) rpcserver.Success {
 }
 
 func (self *shellservice) Myid(params interface{}) rpcserver.Success {
-	entity := p2pservice.Myid()
+	id, addrs := p2pservice.Myid()
+	entity := make(map[string]interface{})
+	entity["id"] = id
+	entity["addrs"] = addrs
 	entity["vsn"] = version
 	return rpcserver.Success{
 		Success: true,
