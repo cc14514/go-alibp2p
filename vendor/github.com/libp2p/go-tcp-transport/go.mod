@@ -13,5 +13,3 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/multiformats/go-multihash v0.0.5 // indirect
 )
-
-go 1.13

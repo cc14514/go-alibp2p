@@ -144,7 +144,9 @@ func (self *Service) Myid() (id string, addrs []string) {
 	id = self.host.ID().Pretty()
 	addrs = make([]string, 0)
 	for _, maddr := range self.host.Addrs() {
-		addrs = append(addrs, maddr.String())
+		if a := maddr.String(); !strings.Contains(a, "/p2p-circuit") {
+			addrs = append(addrs, maddr.String())
+		}
 	}
 	return
 }
@@ -413,7 +415,9 @@ func (self *Service) Findpeer(id string) ([]string, error) {
 	}
 	addrs := make([]string, 0)
 	for _, addr := range pi.Addrs {
-		addrs = append(addrs, addr.String())
+		if a := addr.String(); !strings.Contains(a, "/p2p-circuit") {
+			addrs = append(addrs, addr.String())
+		}
 	}
 	return addrs, nil
 }

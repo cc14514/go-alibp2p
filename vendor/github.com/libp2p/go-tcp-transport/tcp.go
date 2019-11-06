@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"context"
-	"errors"
 	"net"
 	"time"
 
@@ -61,8 +60,6 @@ type TcpTransport struct {
 	ConnectTimeout time.Duration
 
 	reuse rtpt.Transport
-	// add by liangc
-	list manet.Listener
 }
 
 var _ transport.Transport = &TcpTransport{}
@@ -122,18 +119,9 @@ func (t *TcpTransport) maListen(laddr ma.Multiaddr) (manet.Listener, error) {
 	return manet.Listen(laddr)
 }
 
-// add by liangc
-func (t *TcpTransport) GetListen() (manet.Listener, error) {
-	if t.list == nil {
-		return nil, errors.New("nil point")
-	}
-	return t.list, nil
-}
-
 // Listen listens on the given multiaddr.
 func (t *TcpTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
 	list, err := t.maListen(laddr)
-	t.list = list
 	if err != nil {
 		return nil, err
 	}

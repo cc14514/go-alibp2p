@@ -14,7 +14,6 @@ import (
 	"github.com/cc14514/go-lightrpc/rpcserver"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli"
 	"io"
 	"io/ioutil"
@@ -33,7 +32,6 @@ const (
 	echopid = "/echo/1.0.0"
 	pingpid = "/ping/1.0.0"
 	pongpid = "/pong/1.0.0"
-	msgpid  = "/msg/1.0.0"
 )
 
 var (
@@ -262,6 +260,7 @@ var (
 	defBootnodes = []string{
 		"/ip4/101.251.230.218/tcp/10000/ipfs/16Uiu2HAkzfSuviNuR7ez9BMkYw98YWNjyBNNmSLNnoX2XADfZGqP",
 	}
+
 )
 
 func watchpeer() {
@@ -300,6 +299,10 @@ type (
 		Data     interface{}
 	}
 	cmdFn func(args ...string) (interface{}, error)
+	peerinfo struct {
+		ID    string
+		Addrs []string
+	}
 )
 
 //http://localhost:8081/api/?body={"service":"shell","method":"peers"}
@@ -317,22 +320,23 @@ func (self *shellservice) Peers(params interface{}) rpcserver.Success {
 	}
 }
 
+
 //http://localhost:8081/api/?body={"service":"shell","method":"conns"}
 func (self *shellservice) Conns(params interface{}) rpcserver.Success {
 	s := time.Now()
 	direct, relay, total := p2pservice.Peers()
-	dpis := make([]peer.AddrInfo, 0)
+	dpis := make([]peerinfo, 0)
 	for _, id := range direct {
-		if pi, err := p2pservice.Findpeer(id); err == nil {
-			dpis = append(dpis, pi)
+		if addrs, err := p2pservice.Findpeer(id); err == nil {
+			dpis = append(dpis, peerinfo{id, addrs})
 		}
 	}
-	rpis := make(map[string][]peer.AddrInfo)
+	rpis := make(map[string][]peerinfo)
 	for rid, ids := range relay {
-		pis := make([]peer.AddrInfo, 0)
+		pis := make([]peerinfo, 0)
 		for _, id := range ids {
-			if pi, err := p2pservice.Findpeer(id); err == nil {
-				pis = append(pis, pi)
+			if addrs, err := p2pservice.Findpeer(id); err == nil {
+				pis = append(pis, peerinfo{id, addrs})
 			}
 		}
 		rpis[rid] = pis
@@ -342,8 +346,8 @@ func (self *shellservice) Conns(params interface{}) rpcserver.Success {
 		Entity: struct {
 			TimeUsed string
 			Total    int
-			Direct   []peer.AddrInfo
-			Relay    map[string][]peer.AddrInfo
+			Direct   []peerinfo
+			Relay    map[string][]peerinfo
 		}{time.Since(s).String(), total, dpis, rpis},
 	}
 }

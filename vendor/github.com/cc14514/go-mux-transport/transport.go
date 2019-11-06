@@ -65,12 +65,16 @@ type (
 	}
 )
 
+func (m *MuxListener) Close() error {
+	return nil
+}
+
 func (m *MuxListener) Multiaddr() ma.Multiaddr {
 	return m.maddr
 }
 
 func (m *MuxListener) Accept() (manet.Conn, error) {
-	return m.Listener.Accept()
+	return nil, errors.New("[ignoe error] : netmux can not do accept")
 }
 
 func NewMuxTransport(tpt *tcp.TcpTransport) *MuxTransport {
@@ -232,12 +236,7 @@ func (m MuxTransport) CanDial(addr ma.Multiaddr) bool {
 }
 
 func (m MuxTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
-	list, err := m.tpt.GetListen()
-	if err != nil {
-		return nil, err
-	}
-	ml := &MuxListener{Listener: list}
-	ml.maddr = laddr
+	ml := &MuxListener{maddr: laddr}
 	return m.tpt.Upgrader.UpgradeListener(m, ml), nil
 }
 

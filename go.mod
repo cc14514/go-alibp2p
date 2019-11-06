@@ -32,6 +32,4 @@ replace github.com/libp2p/go-libp2p => ./libs/go-libp2p
 
 replace github.com/libp2p/go-libp2p-swarm => ./libs/go-libp2p-swarm
 
-replace github.com/libp2p/go-tcp-transport => ./libs/go-tcp-transport
-
 replace github.com/cc14514/go-mux-transport => ./libs/go-mux-transport
