@@ -15,4 +15,4 @@ require (
 
 go 1.13
 
-replace github.com/libp2p/go-tcp-transport => ../go-tcp-transport
+//replace github.com/libp2p/go-tcp-transport => ../go-tcp-transport

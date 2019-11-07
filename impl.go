@@ -90,7 +90,7 @@ func NewService(cfg Config) Alibp2pService {
 	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
 		full := addr.Encapsulate(hostAddr)
-		log.Println(i, "address", full)
+		log.Println(i, "listen on", full)
 	}
 
 	if cfg.Bootnodes != nil && len(cfg.Bootnodes) > 0 {

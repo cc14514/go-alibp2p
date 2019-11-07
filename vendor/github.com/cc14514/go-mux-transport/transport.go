@@ -74,6 +74,8 @@ func (m *MuxListener) Multiaddr() ma.Multiaddr {
 }
 
 func (m *MuxListener) Accept() (manet.Conn, error) {
+	log.Println("netmux-transport-started", m.maddr.String())
+	select {}
 	return nil, errors.New("[ignoe error] : netmux can not do accept")
 }
 

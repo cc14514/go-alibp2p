@@ -1,18 +1,9 @@
 # github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
 github.com/btcsuite/btcd/btcec
-# github.com/cc14514/go-cookiekit v0.0.0-20181212102238-6a04bd7258bb
-github.com/cc14514/go-cookiekit/collections/bag
-github.com/cc14514/go-cookiekit/collections/queue
-github.com/cc14514/go-cookiekit/collections/stack
-github.com/cc14514/go-cookiekit/graph
-# github.com/cc14514/go-lightrpc v0.0.0-20191009082400-f2eba654f95d
-github.com/cc14514/go-lightrpc/rpcserver
-# github.com/cc14514/go-mux-transport v0.0.0-20191106101528-14db6123e8a9
+# github.com/cc14514/go-mux-transport v0.0.0-20191107033455-2e89816349e6
 github.com/cc14514/go-mux-transport
 # github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
-# github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
-github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
 github.com/davidlazar/go-crypto/salsa20
 # github.com/gogo/protobuf v1.2.1
@@ -70,7 +61,7 @@ github.com/libp2p/go-buffer-pool
 github.com/libp2p/go-conn-security-multistream
 # github.com/libp2p/go-flow-metrics v0.0.1
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.1.0 => ./libs/go-libp2p
+# github.com/libp2p/go-libp2p v0.1.0 => github.com/cc14514/go-libp2p v0.0.0-20191107035444-bf2343196cca
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/p2p/host/basic
@@ -82,7 +73,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 # github.com/libp2p/go-libp2p-autonat v0.1.0
 github.com/libp2p/go-libp2p-autonat
 github.com/libp2p/go-libp2p-autonat/pb
-# github.com/libp2p/go-libp2p-circuit v0.1.0 => ./libs/go-libp2p-circuit
+# github.com/libp2p/go-libp2p-circuit v0.1.0 => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107035843-34ac9445e418
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
 # github.com/libp2p/go-libp2p-connmgr v0.1.0
@@ -109,7 +100,7 @@ github.com/libp2p/go-libp2p-core/transport
 github.com/libp2p/go-libp2p-crypto
 # github.com/libp2p/go-libp2p-discovery v0.1.0
 github.com/libp2p/go-libp2p-discovery
-# github.com/libp2p/go-libp2p-kad-dht v0.1.0 => ./libs/go-libp2p-kad-dht
+# github.com/libp2p/go-libp2p-kad-dht v0.1.0 => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20191107040323-2463a62af156
 github.com/libp2p/go-libp2p-kad-dht
 github.com/libp2p/go-libp2p-kad-dht/metrics
 github.com/libp2p/go-libp2p-kad-dht/opts
@@ -141,7 +132,7 @@ github.com/libp2p/go-libp2p-routing/notifications
 # github.com/libp2p/go-libp2p-secio v0.1.0
 github.com/libp2p/go-libp2p-secio
 github.com/libp2p/go-libp2p-secio/pb
-# github.com/libp2p/go-libp2p-swarm v0.1.0 => ./libs/go-libp2p-swarm
+# github.com/libp2p/go-libp2p-swarm v0.1.0
 github.com/libp2p/go-libp2p-swarm
 # github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 github.com/libp2p/go-libp2p-transport-upgrader
@@ -199,12 +190,6 @@ github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
-# github.com/rs/cors v1.7.0
-github.com/rs/cors
-# github.com/russross/blackfriday/v2 v2.0.1
-github.com/russross/blackfriday/v2
-# github.com/shurcooL/sanitized_anchor_name v1.0.0
-github.com/shurcooL/sanitized_anchor_name
 # github.com/spacemonkeygo/openssl v0.0.0-20181017203307-c2dcc5cca94a
 github.com/spacemonkeygo/openssl
 github.com/spacemonkeygo/openssl/utils
@@ -212,14 +197,6 @@ github.com/spacemonkeygo/openssl/utils
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
 github.com/spaolacci/murmur3
-# github.com/tidwall/gjson v1.3.2
-github.com/tidwall/gjson
-# github.com/tidwall/match v1.0.1
-github.com/tidwall/match
-# github.com/tidwall/pretty v1.0.0
-github.com/tidwall/pretty
-# github.com/urfave/cli v1.22.1
-github.com/urfave/cli
 # github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 github.com/whyrusleeping/base32
 # github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1

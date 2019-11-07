@@ -226,6 +226,10 @@ func (ids *IDService) populateMessage(mes *pb.Identify, c network.Conn) {
 	// add by liangc <<
 	mes.ListenAddrs = make([][]byte, len(laddrs))
 	for i, addr := range laddrs {
+		if strings.Contains(addr.String(), "127.0.0.1") || strings.Contains(addr.String(), "localhost") {
+			continue
+		}
+		//fmt.Println("<--------------------------------------<", addr.String())
 		mes.ListenAddrs[i] = addr.Bytes()
 	}
 	log.Debugf("%s sent listen addrs to %s: %s", c.LocalPeer(), c.RemotePeer(), laddrs)
@@ -285,18 +289,18 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 		//	containsPubaddr = true
 		//}
 		lmaddrs = append(lmaddrs, maddr)
+		//fmt.Println(">-------------------------------------->", maddr.String())
 	}
 	// add by liangc >>
 	raddr, _ := ma.NewMultiaddr("/p2p-circuit/ipfs/" + p.Pretty())
 	lmaddrs = append(lmaddrs, raddr)
 
-	/*
-	fmt.Println(1, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
-	for _, maddr := range lmaddrs {
-		fmt.Println(maddr)
-	}
-	fmt.Println(1, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
-	*/
+	//fmt.Println(1, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+	//for _, maddr := range lmaddrs {
+	//	fmt.Println(maddr)
+	//}
+	//fmt.Println(1, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
+
 	//if !containsPubaddr {
 	//	lmaddrs = append(lmaddrs, c.RemoteMultiaddr())
 	//}
@@ -305,15 +309,15 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 	ipmap := netmux.MaddrsToIps(lmaddrs)
 	portmap := netmux.MaddrsToPorts(lmaddrs)
 	muxAddr, localMux := netmux.MuxAddress(ids.Host.Addrs())
-	/*
-	fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
-	fmt.Println("isRelay", isRelay)
-	fmt.Println("ipmap", ipmap)
-	fmt.Println("portmap", portmap)
-	fmt.Println("muxAddr", muxAddr)
-	fmt.Println("localMux", localMux)
-	fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
-	*/
+
+	//fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+	//fmt.Println("isRelay", isRelay)
+	//fmt.Println("ipmap", ipmap)
+	//fmt.Println("portmap", portmap)
+	//fmt.Println("muxAddr", muxAddr)
+	//fmt.Println("localMux", localMux)
+	//fmt.Println(2, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+
 	if !isRelay {
 		//fmt.Println("> ipmap", ipmap)
 		//fmt.Println("> portmap", portmap)
@@ -351,11 +355,11 @@ func (ids *IDService) consumeMessage(mes *pb.Identify, c network.Conn) {
 		}
 	}
 	/*
-	fmt.Println(4, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
-	for i, maddr := range lmaddrs {
-		fmt.Println(i, maddr)
-	}
-	fmt.Println(4, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
+		fmt.Println(4, ">>>>>>>>>>>>>> start", c.RemotePeer().Pretty())
+		for i, maddr := range lmaddrs {
+			fmt.Println(i, maddr)
+		}
+		fmt.Println(4, ">>>>>>>>>>>>>> end", c.RemotePeer().Pretty())
 	*/
 	// add by liangc <<
 

@@ -1,7 +1,7 @@
 module github.com/libp2p/go-libp2p
 
 require (
-	github.com/cc14514/go-mux-transport v0.0.0-20191022083255-64706914fab5
+	github.com/cc14514/go-mux-transport v0.0.0-20191107033455-2e89816349e6
 	github.com/gogo/protobuf v1.2.1
 	github.com/ipfs/go-cid v0.0.2
 	github.com/ipfs/go-detect-race v0.0.1
@@ -40,8 +40,8 @@ require (
 
 go 1.13
 
-replace github.com/libp2p/go-libp2p-swarm => ../go-libp2p-swarm
+//replace github.com/libp2p/go-libp2p-swarm => ../go-libp2p-swarm
 
-replace github.com/libp2p/go-tcp-transport => ../go-tcp-transport
+//replace github.com/libp2p/go-tcp-transport => ../go-tcp-transport
 
-replace github.com/cc14514/go-mux-transport => ../go-mux-transport
+//replace github.com/cc14514/go-mux-transport => ../go-mux-transport

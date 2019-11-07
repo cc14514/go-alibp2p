@@ -20,7 +20,3 @@ require (
 	github.com/whyrusleeping/mafmt v1.2.8
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 )
-
-go 1.13
-
-replace github.com/libp2p/go-tcp-transport => ../go-tcp-transport

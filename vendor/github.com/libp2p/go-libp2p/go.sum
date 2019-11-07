@@ -20,6 +20,9 @@ github.com/cc14514/go-mux-transport v0.0.0-20191022055908-1fea311bf884/go.mod h1
 github.com/cc14514/go-mux-transport v0.0.0-20191022062425-d82ab7392b7b/go.mod h1:LDja4SxfqDZy3GE1HgcVGCJNVOSxgMs04ggKKJADkfc=
 github.com/cc14514/go-mux-transport v0.0.0-20191022082210-6081bd905793/go.mod h1:geyawm+yFQe8VbW+CWCiiq6zjnuWfn2Pqpzk7TTxsTY=
 github.com/cc14514/go-mux-transport v0.0.0-20191022083255-64706914fab5/go.mod h1:p8hdnvoost766rFYPBHLHaFHtKnPcNi3HaDa5OZqnCw=
+github.com/cc14514/go-mux-transport v0.0.0-20191106101528-14db6123e8a9/go.mod h1:/jSlAQo9e+97aD4lvdf/pj5oo4IamfmEzNtDIZj+LdQ=
+github.com/cc14514/go-mux-transport v0.0.0-20191107022647-06005832470f/go.mod h1:LDja4SxfqDZy3GE1HgcVGCJNVOSxgMs04ggKKJADkfc=
+github.com/cc14514/go-mux-transport v0.0.0-20191107033455-2e89816349e6/go.mod h1:Xpnt1yTwWgRdeR7VeQafDvmjqteADg6QKwG1X14WJeE=
 github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmfM=
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
