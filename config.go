@@ -11,7 +11,7 @@ import (
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	apnet "github.com/libp2p/go-libp2p-pnet"
 	yamux "github.com/libp2p/go-libp2p-yamux"
-	"os"
+	"io/ioutil"
 	"strings"
 	"time"
 )
@@ -57,10 +57,11 @@ func (cfg Config) MuxTransportOption() libp2p.Option {
 	ymxtpt := &yamux.Transport{
 		AcceptBacklog:          512,
 		EnableKeepAlive:        true,
-		KeepAliveInterval:      45 * time.Second,
+		KeepAliveInterval:      60 * time.Second,
 		ConnectionWriteTimeout: 45 * time.Second,
 		MaxStreamWindowSize:    uint32(1024 * 1024),
-		LogOutput:              os.Stderr,
+		LogOutput:              ioutil.Discard,
+		//LogOutput:              os.Stderr,
 		ReadBufSize:            4096,
 		MaxMessageSize:         128 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
 		WriteCoalesceDelay:     100 * time.Microsecond,

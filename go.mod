@@ -24,4 +24,4 @@ replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-
 
 replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.0-20191107035444-bf2343196cca
 
-replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107035843-34ac9445e418
+replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107104213-c68c8985f5d0

@@ -444,10 +444,13 @@ func (self *Service) Get(k string) ([]byte, error) {
 }
 
 func (self *Service) BootstrapOnce() error {
-	connectFn(self.ctx, self.host, self.bootnodes)
-	err := self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
+	err := connectFn(self.ctx, self.host, self.bootnodes)
 	if err != nil {
-		log.Println("bootstrap-error", "err", err)
+		log.Println("bootstrap-once-conn-error", "err", err)
+	}
+	err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
+	if err != nil {
+		log.Println("bootstrap-once-query-error", "err", err)
 	}
 	return err
 }
@@ -467,11 +470,12 @@ func (self *Service) bootstrap() error {
 				atomic.StoreInt32(&loopboot, 0)
 				atomic.StoreInt32(&loopbootstrap, 0)
 			}()
+			timer := time.NewTimer(time.Second)
 			for {
 				select {
 				case <-self.ctx.Done():
 					return
-				case <-time.After(time.Duration(period) * time.Second):
+				case <-timer.C:
 					if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
 						// 在 peerstore 中随机找至多 5 个节点尝试连接
 						var (
@@ -503,6 +507,7 @@ func (self *Service) bootstrap() error {
 						}
 					}
 				}
+				timer.Reset(time.Duration(period) * time.Second)
 			}
 		}
 		log.Println("loopboot-end")

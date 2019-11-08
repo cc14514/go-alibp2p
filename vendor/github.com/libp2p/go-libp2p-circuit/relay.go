@@ -142,11 +142,8 @@ func (r *Relay) GetActiveHops() int32 {
 }
 
 func (r *Relay) DialPeer(ctx context.Context, relay peer.AddrInfo, dest peer.AddrInfo) (*Conn, error) {
-
-	fmt.Println("<<--replay--", "relay=", relay.String(), "dest=", dest.String())
-
-	log.Debugf("dialing peer %s through relay %s", dest.ID, relay.ID)
-
+	//fmt.Println("<<--replay--", "relay=", relay.String(), "dest=", dest.String())
+	//log.Debugf("dialing peer %s through relay %s", dest.ID, relay.ID)
 	if len(relay.Addrs) > 0 {
 		r.host.Peerstore().AddAddrs(relay.ID, relay.Addrs, peerstore.TempAddrTTL)
 	}

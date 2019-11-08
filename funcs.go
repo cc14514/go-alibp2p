@@ -165,17 +165,15 @@ var (
 			wg.Add(1)
 			go func(p peer.AddrInfo) {
 				defer wg.Done()
-				defer log.Println("connect to", ph.ID(), p.ID)
-				log.Printf("%s connecting to %s : %v", ph.ID(), p.ID, p.Addrs)
+				log.Printf("from %s connecting to %s : %v", ph.ID().Pretty(), p.ID, p.Addrs)
 				ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 				if err := ph.Connect(ctx, p); err != nil {
-					log.Println("connect failed", p.ID)
-					log.Printf("failed to connect with %v: %s", p.ID, err)
+					//log.Println("connect failed", p.ID)
+					//log.Printf("failed to connect with %v: %s", p.ID, err)
 					errs <- err
 					return
 				}
-				log.Println("connect success", p.ID, ph.Peerstore().PeerInfo(p.ID))
-				log.Printf("connected with %v", p.ID)
+				log.Println("connect success :", p.ID.Pretty())
 			}(p)
 		}
 		wg.Wait()

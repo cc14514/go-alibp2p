@@ -73,7 +73,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 # github.com/libp2p/go-libp2p-autonat v0.1.0
 github.com/libp2p/go-libp2p-autonat
 github.com/libp2p/go-libp2p-autonat/pb
-# github.com/libp2p/go-libp2p-circuit v0.1.0 => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107035843-34ac9445e418
+# github.com/libp2p/go-libp2p-circuit v0.1.0 => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107104213-c68c8985f5d0
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
 # github.com/libp2p/go-libp2p-connmgr v0.1.0
