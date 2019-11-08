@@ -275,12 +275,10 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 		switch t {
 		case CONNT_TYPE_DIRECT:
 			if !self.isDirectFn(conn.RemotePeer().Pretty()) {
-				log.Println("alibp2p-OnConnected skip : want direct :", conn.RemotePeer().Pretty())
 				return
 			}
 		case CONN_TYPE_RELAY:
 			if self.isDirectFn(conn.RemotePeer().Pretty()) {
-				fmt.Println("alibp2p-OnConnected skip : want relay :", conn.RemotePeer().Pretty())
 				return
 			}
 		case CONN_TYPE_ALL:
