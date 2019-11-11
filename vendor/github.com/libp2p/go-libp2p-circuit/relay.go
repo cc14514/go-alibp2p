@@ -30,12 +30,13 @@ const ProtoID = "/libp2p/circuit/relay/0.1.0"
 const maxMessageSize = 4096
 
 var (
-	RelayAcceptTimeout   = 10 * time.Second
-	HopConnectTimeout    = 30 * time.Second
-	StopHandshakeTimeout = 1 * time.Minute
+	RelayAcceptTimeout   = 10 * time.Second // 10
+	HopConnectTimeout    = 20 * time.Second // 30
+	StopHandshakeTimeout = 40 * time.Second // 60
+	DialDelay            = 3 * time.Second // add by liangc
+	HopStreamBufferSize  = 4096
+	HopStreamLimit       = 1 << 19 // 512K hops for 1M goroutines
 
-	HopStreamBufferSize = 4096
-	HopStreamLimit      = 1 << 19 // 512K hops for 1M goroutines
 )
 
 // Relay is the relay transport and service.
@@ -146,6 +147,15 @@ func (r *Relay) DialPeer(ctx context.Context, relay peer.AddrInfo, dest peer.Add
 	//log.Debugf("dialing peer %s through relay %s", dest.ID, relay.ID)
 	if len(relay.Addrs) > 0 {
 		r.host.Peerstore().AddAddrs(relay.ID, relay.Addrs, peerstore.TempAddrTTL)
+	}
+
+	// add by liangc : 降低优先级，延迟拨出即可
+	nodelay := ctx.Value("nodelay")
+	if nodelay == nil || nodelay.(string) != "true" {
+		//fmt.Println("relay-dial-delay : delay", DialDelay, "from", relay.ID.Pretty(), "to", dest.ID.Pretty())
+		time.Sleep(DialDelay)
+		//} else {
+		//fmt.Println("relay-dial-delay : no-delay", "from", relay.ID.Pretty(), "to", dest.ID.Pretty())
 	}
 
 	s, err := r.host.NewStream(ctx, relay.ID, ProtoID)

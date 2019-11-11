@@ -60,6 +60,8 @@ type (
 		PutPeerMeta(id, key string, v interface{}) error
 		GetPeerMeta(id, key string) (interface{}, error)
 
+		GetSession(id string) (session string, inbound bool, err error)
+
 		Findpeer(id string) ([]string, error) // return addrs,err
 
 		BootstrapOnce() error

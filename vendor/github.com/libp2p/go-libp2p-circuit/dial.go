@@ -26,13 +26,18 @@ func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, err
 	parts := ma.Split(a)
 
 	spl := ma.Cast(ma.CodeToVarint(P_CIRCUIT))
-
+	//splNodelay := ma.Cast(ma.CodeToVarint(P_CIRCUIT_NODELAY))
+	//aaa := r.host.Peerstore().PeerInfo(p).Addrs
+	//fmt.Println("ZZZZZZZZZZZZZZZZZZ", p.Pretty(), a, "--", aaa)
 	var relayaddr, destaddr ma.Multiaddr
 	for i, p := range parts {
+		//if p.Equal(splNodelay) {
+		//ctx = context.WithValue(ctx, NodelayProtocol.Name, "true")
+		//} else if p.Equal(spl) {
 		if p.Equal(spl) {
 			relayaddr = ma.Join(parts[:i]...)
 			destaddr = ma.Join(parts[i+1:]...)
-			break
+			//break
 		}
 	}
 	dinfo := &peer.AddrInfo{ID: p, Addrs: []ma.Multiaddr{}}

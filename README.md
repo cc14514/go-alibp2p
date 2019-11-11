@@ -10,9 +10,10 @@
 
 ```
 // 需要将以下内容添加到 go.mod 尾部
+replace github.com/libp2p/go-libp2p-swarm => github.com/cc14514/go-libp2p-swarm v0.0.0-20191111121429-bf40e092865b
 replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20191107040323-2463a62af156
 replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.0-20191107035444-bf2343196cca
-replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.0-20191107035843-34ac9445e418
+replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.0-20191111122236-413fc41ad3d7
 ```
 
 ## example

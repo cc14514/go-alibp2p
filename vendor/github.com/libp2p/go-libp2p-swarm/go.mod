@@ -20,3 +20,5 @@ require (
 	github.com/whyrusleeping/mafmt v1.2.8
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 )
+
+go 1.13

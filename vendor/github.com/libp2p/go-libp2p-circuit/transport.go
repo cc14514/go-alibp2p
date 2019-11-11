@@ -12,6 +12,7 @@ import (
 )
 
 const P_CIRCUIT = 290
+//const P_CIRCUIT_NODELAY = 291
 
 var Protocol = ma.Protocol{
 	Code:  P_CIRCUIT,
@@ -20,8 +21,16 @@ var Protocol = ma.Protocol{
 	VCode: ma.CodeToVarint(P_CIRCUIT),
 }
 
+//var NodelayProtocol = ma.Protocol{
+//	Code:  P_CIRCUIT_NODELAY,
+//	Size:  0,
+//	Name:  "nodelay",
+//	VCode: ma.CodeToVarint(P_CIRCUIT_NODELAY),
+//}
+
 func init() {
 	ma.AddProtocol(Protocol)
+	//ma.AddProtocol(NodelayProtocol)
 }
 
 var _ transport.Transport = (*RelayTransport)(nil)
