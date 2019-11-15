@@ -251,7 +251,7 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 		log.Println("PreConnect-error-2", "id", id.Pretty(), "err", err)
 		return err
 	}
-	ctx := context.WithValue(self.ctx,"nodelay","true")
+	ctx := context.WithValue(self.ctx, "nodelay", "true")
 	err = connectFn(ctx, self.host, []peer.AddrInfo{pi})
 	if err != nil {
 		log.Println("PreConnect-error-3", "id", id.Pretty(), "err", err)
@@ -358,7 +358,7 @@ func (self *Service) Table() map[string][]string {
 func (self *Service) GetSession(id string) (session string, inbound bool, err error) {
 	err = fmt.Errorf("getsession fail : %s not found.", id)
 	for _, conn := range self.host.Network().Conns() {
-		if conn.RemotePeer().Pretty() == id {
+		if strings.Contains(id, conn.RemotePeer().Pretty()) {
 			switch conn.Stat().Direction {
 			case network.DirInbound:
 				inbound = true
