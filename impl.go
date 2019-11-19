@@ -180,16 +180,16 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	id, s, _, err := self.SendMsg(to, protocolID, msg)
-	self.host.ConnManager().Protect(id, "tmp")
-	defer func() {
-		if err == nil && s != nil {
-			if s != nil {
-				go helpers.FullClose(s)
-			}
-		}
-		self.host.ConnManager().Unprotect(id, "tmp")
-	}()
-	return err
+	//self.host.ConnManager().Protect(id, "tmp")
+	if s != nil {
+		go helpers.FullClose(s)
+	}
+	if err != nil {
+		self.host.Network().ClosePeer(id)
+		return err
+	}
+	//self.host.ConnManager().Unprotect(id, "tmp")
+	return nil
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
@@ -225,8 +225,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	}
 
-	s, err := self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
-
+	s, err := self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
 	if err != nil {
 		log.Println(err)
 		return peerid, nil, 0, err
@@ -237,7 +236,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 		log.Println(err)
 		return peerid, nil, total, err
 	}
-	return peerid, s, total, err
+	return peerid, s, total, nil
 }
 
 func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
@@ -261,12 +260,12 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	self.host.ConnManager().Protect(id, "pre")
 	go func(ctx context.Context, id peer.ID) {
 		select {
-		case <-time.After(peerstore.TempAddrTTL):
+		case <-time.After(peerstore.TempAddrTTL / 4):
 			ok := self.host.ConnManager().Unprotect(id, "pre")
 			log.Println("PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
 		case <-ctx.Done():
 		}
-	}(self.ctx, id)
+	}(ctx, id)
 	return nil
 }
 

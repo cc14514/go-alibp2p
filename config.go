@@ -53,18 +53,35 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 	return nil, errors.New("disable psk")
 }
 
+/*
+
+// DefaultConfig is used to return a default configuration
+func DefaultConfig() *Config {
+	return &Config{
+		AcceptBacklog:          256,
+		EnableKeepAlive:        true,
+		KeepAliveInterval:      30 * time.Second,
+		ConnectionWriteTimeout: 10 * time.Second,
+		MaxStreamWindowSize:    initialStreamWindow,
+		LogOutput:              os.Stderr,
+		ReadBufSize:            4096,
+		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
+		WriteCoalesceDelay:     100 * time.Microsecond,
+	}
+}
+*/
 func (cfg Config) MuxTransportOption() libp2p.Option {
 	ymxtpt := &yamux.Transport{
-		AcceptBacklog:          512,
+		AcceptBacklog:          256,
 		EnableKeepAlive:        true,
-		KeepAliveInterval:      60 * time.Second,
+		KeepAliveInterval:      45 * time.Second,
 		ConnectionWriteTimeout: 45 * time.Second,
-		MaxStreamWindowSize:    uint32(1024 * 1024),
+		MaxStreamWindowSize:    uint32(256 * 1024),
 		LogOutput:              ioutil.Discard,
 		//LogOutput:              os.Stderr,
-		ReadBufSize:            4096,
-		MaxMessageSize:         128 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
-		WriteCoalesceDelay:     100 * time.Microsecond,
+		ReadBufSize:        4096,
+		MaxMessageSize:     128 * 1024, // Means 128KiB/10s
+		WriteCoalesceDelay: 100 * time.Microsecond,
 	}
 	return libp2p.ChainOptions(
 		libp2p.Muxer("/yamux/1.0.0", ymxtpt),
