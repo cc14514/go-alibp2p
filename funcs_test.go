@@ -23,6 +23,8 @@ package alibp2p
 import (
 	"context"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -57,7 +59,7 @@ func TestAsyncRunner_Apply(t *testing.T) {
 				fmt.Println("tn", ctx.Value("tn"), "CCCCCCCCC", i, "pool-size", runner.Size())
 			}, i)
 		}
-		time.Sleep(3*time.Second)
+		time.Sleep(3 * time.Second)
 	}()
 	runner.WaitClose()
 	fmt.Println("ttl", time.Since(now), runner.Size())
@@ -68,4 +70,26 @@ func TestAtomic(t *testing.T) {
 	fmt.Println(i, j, k)
 	fmt.Println(atomic.CompareAndSwapInt32(&i, i, k))
 	fmt.Println(i, j, k)
+}
+
+func TestConnectArgs(t *testing.T) {
+	url := "/ip4/39.100.34.235/mux/5978:30200/ipfs/16Uiu2HAmU6ccPRbZpHpTiKo1mJMATudcLgHAsAbUYmADp9Wjn6GJ"
+	ipfsaddr, err := ma.NewMultiaddr(url)
+	if err != nil {
+		t.Error(err)
+	}
+	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	if err != nil {
+		t.Error(err)
+	}
+	peerid, err := peer.IDB58Decode(pid)
+	if err != nil {
+		t.Error(err)
+	}
+	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
+
+	t.Log(peerid)
+	t.Log(targetPeerAddr)
+	t.Log(targetAddr)
 }

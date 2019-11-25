@@ -42,6 +42,7 @@ type (
 	Alibp2pService interface {
 		Start()
 		Myid() (id string, addrs []string)
+		Connect(url string) error
 		ClosePeer(pubkey *ecdsa.PublicKey) error
 		SetBootnode(peer ...string) error
 		SetHandler(pid string, handler StreamHandler)
