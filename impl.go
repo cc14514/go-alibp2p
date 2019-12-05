@@ -47,6 +47,7 @@ func NewService(cfg Config) Alibp2pService {
 		priv = (crypto.PrivKey)(_p)
 	} else {
 		priv, err = loadid(cfg.Homedir)
+		cfg.PrivKey = (*ecdsa.PrivateKey)((priv).(*crypto.Secp256k1PrivateKey))
 	}
 	list := make([]ma.Multiaddr, 0)
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
@@ -570,4 +571,8 @@ func (self *Service) peersWithoutBootnodes() []peer.AddrInfo {
 	}
 
 	return result
+}
+
+func (self *Service) Nodekey() *ecdsa.PrivateKey {
+	return self.cfg.PrivKey
 }

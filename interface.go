@@ -37,6 +37,7 @@ type (
 		Alibp2pService
 		SetStreamHandler(protoid string, handler func(s network.Stream))
 		SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error)
+		Nodekey() *ecdsa.PrivateKey
 	}
 
 	Alibp2pService interface {
