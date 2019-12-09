@@ -212,6 +212,9 @@ func (self *Service) Connect(url string) error {
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
+	return self.sendMsg(to, protocolID, msg, notimeout)
+}
+func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peer.ID, network.Stream, int, error) {
 	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
@@ -250,6 +253,10 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 		return peerid, nil, 0, err
 	}
 	var total int
+	if notimeout != timeout {
+		s.SetWriteDeadline(timeout)
+		defer s.SetWriteDeadline(notimeout)
+	}
 	total, err = s.Write(msg)
 	if err != nil {
 		log.Println(err)
@@ -329,17 +336,34 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 	}
 }
 
-func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
-	_, s, _, err := self.SendMsg(to, proto, pkg)
+func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
+	tot := notimeout
+	if timeout > 0 {
+		tot = time.Now().Add(timeout)
+	}
+	_, s, _, err := self.sendMsg(to, proto, pkg, tot)
 	if err == nil {
-		s.SetDeadline(time.Now().Add(10 * time.Second))
-		defer helpers.FullClose(s)
+		if tot != notimeout {
+			s.SetReadDeadline(time.Now().Add(timeout))
+		} else {
+			s.SetReadDeadline(time.Now().Add(10 * time.Second))
+		}
+		defer func() {
+			if s != nil {
+				s.SetReadDeadline(notimeout)
+				helpers.FullClose(s)
+			}
+		}()
 		buf, err := ioutil.ReadAll(s)
 		if err == nil {
 			return buf, nil
 		}
 	}
 	return nil, err
+}
+
+func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
+	return self.RequestWithTimeout(to, proto, pkg, 0)
 }
 
 func (self *Service) OnDisconnected(callback DisconnectEvent) {

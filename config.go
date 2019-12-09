@@ -35,6 +35,7 @@ var (
 	pubkeyCache, _          = lru.New(10000)
 	DefaultProtocols        = []protocol.ID{ProtocolDHT}
 	loopboot, loopbootstrap int32
+	notimeout               = time.Time{}
 )
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {

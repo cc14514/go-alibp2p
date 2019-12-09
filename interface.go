@@ -25,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"io"
+	"time"
 )
 
 type (
@@ -50,6 +51,9 @@ type (
 
 		SendMsgAfterClose(to, protocolID string, msg []byte) error
 		Request(to, proto string, msg []byte) ([]byte, error)
+
+		RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error)
+
 		PreConnect(pubkey *ecdsa.PublicKey) error
 
 		OnConnected(ConnType, PreMsg, ConnectEvent)

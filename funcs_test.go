@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"io"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -92,4 +94,43 @@ func TestConnectArgs(t *testing.T) {
 	t.Log(peerid)
 	t.Log(targetPeerAddr)
 	t.Log(targetAddr)
+}
+
+func TestTimeout(t *testing.T) {
+
+	notimeout := time.Time{}
+	fmt.Println("aaaaaaaaa", time.Time{} == notimeout)
+
+	addr := "127.0.0.1:12345"
+	l, _ := net.Listen("tcp", addr)
+	connCh := make(chan net.Conn, 0)
+	go func() {
+		for {
+			conn, _ := l.Accept()
+			connCh <- conn
+		}
+	}()
+
+	go func() {
+		for {
+			fmt.Println("--> Read : ready")
+			conn := <-connCh
+			fmt.Println("--> Read : accepted")
+			buf := make([]byte, 2)
+			for {
+				n, err := io.ReadFull(conn, buf)
+				fmt.Println("--> Read : success", n, err, string(buf))
+			}
+		}
+	}()
+
+	conn, _ := net.Dial("tcp", addr)
+	conn.SetWriteDeadline(time.Now().Add(time.Second * 2))
+	n, err := conn.Write([]byte("hi"))
+	fmt.Println("<-- Write 0 : done", n, err)
+	conn.SetWriteDeadline(time.Time{})
+	time.Sleep(3 * time.Second)
+	n, err = conn.Write([]byte("hi"))
+	fmt.Println("<-- Write 1 : done", n, err)
+	time.Sleep(time.Second)
 }
