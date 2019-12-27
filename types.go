@@ -27,7 +27,8 @@ type (
 		Discover                               bool
 		Networkid, MuxPort                     *big.Int
 
-		PrivKey *ecdsa.PrivateKey
+		PrivKey  *ecdsa.PrivateKey
+		Loglevel int // 3 INFO, 4 DEBUG, 5 TRACE
 	}
 
 	Service struct {

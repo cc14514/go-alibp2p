@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	netmux "github.com/cc14514/go-mux-transport"
+	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
@@ -19,6 +20,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
+	gologging "github.com/whyrusleeping/go-logging"
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"log"
@@ -28,7 +30,20 @@ import (
 )
 
 func NewService(cfg Config) Alibp2pService {
+	switch cfg.Loglevel {
+	case 5:
+		golog.SetAllLoggers(gologging.DEBUG)
+	case 3, 4:
+		golog.SetAllLoggers(gologging.NOTICE)
+	case 1, 2:
+		golog.SetAllLoggers(gologging.WARNING)
+	case 0:
+		golog.SetAllLoggers(gologging.CRITICAL)
+	default:
+		golog.SetAllLoggers(gologging.ERROR)
+	}
 	log.Println("alibp2p.NewService", cfg)
+
 	var (
 		err             error
 		router          routing.Routing
@@ -81,7 +96,7 @@ func NewService(cfg Config) Alibp2pService {
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
 	}
-	optlist = append(optlist, cfg.MuxTransportOption())
+	optlist = append(optlist, cfg.MuxTransportOption(cfg.Loglevel))
 
 	host, err := libp2p.New(cfg.Ctx, optlist...)
 	if err != nil {
@@ -325,11 +340,11 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 		// 连出去的，并且 preMsg 有值，就给对方发消息
 		if !in && preMsg != nil {
 			proto, pkg := preMsg()
-			resp, err := self.Request(conn.RemotePeer().Pretty(), proto, pkg)
+			resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 2*time.Second)
 			if err == nil {
 				preRtn = resp
 			} else {
-				preRtn = []byte(err.Error())
+				preRtn = append(make([]byte, 8), []byte(err.Error())...)
 			}
 		}
 		callbackFn(in, sid, pubkey, preRtn)
