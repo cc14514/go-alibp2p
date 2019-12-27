@@ -615,3 +615,22 @@ func (self *Service) peersWithoutBootnodes() []peer.AddrInfo {
 func (self *Service) Nodekey() *ecdsa.PrivateKey {
 	return self.cfg.PrivKey
 }
+
+//Protect(id, tag string)
+//Unprotect(id, tag string) bool
+func (self *Service) Protect(id, tag string) error {
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return err
+	}
+	self.host.ConnManager().Protect(p, tag)
+	return nil
+}
+
+func (self *Service) Unprotect(id, tag string) (bool, error) {
+	p, err := peer.IDB58Decode(id)
+	if err != nil {
+		return false, err
+	}
+	return self.host.ConnManager().Unprotect(p, tag), nil
+}

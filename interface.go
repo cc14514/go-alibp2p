@@ -74,5 +74,8 @@ type (
 
 		Put(k string, v []byte) error
 		Get(k string) ([]byte, error)
+
+		Protect(id, tag string) error
+		Unprotect(id, tag string) (bool, error)
 	}
 )
