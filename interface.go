@@ -21,6 +21,7 @@
 package alibp2p
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -77,5 +78,9 @@ type (
 
 		Protect(id, tag string) error
 		Unprotect(id, tag string) (bool, error)
+
+		Advertise(ctx context.Context, ns string)
+
+		FindProviders(ctx context.Context, ns string) ([]string, error)
 	}
 )

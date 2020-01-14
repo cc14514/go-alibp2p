@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	"io"
 	"math/big"
 	"sync"
@@ -32,14 +33,15 @@ type (
 	}
 
 	Service struct {
-		ctx        context.Context
-		homedir    string
-		host       host.Host
-		router     routing.Routing
-		bootnodes  []peer.AddrInfo
-		cfg        Config
-		notifiee   *network.NotifyBundle
-		isDirectFn func(id string) bool
+		ctx              context.Context
+		homedir          string
+		host             host.Host
+		router           routing.Routing
+		routingDiscovery *discovery.RoutingDiscovery
+		bootnodes        []peer.AddrInfo
+		cfg              Config
+		notifiee         *network.NotifyBundle
+		isDirectFn       func(id string) bool
 	}
 	blankValidator struct{}
 	ConnType       int

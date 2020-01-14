@@ -3,6 +3,7 @@ package alibp2p
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	netmux "github.com/cc14514/go-mux-transport"
 	golog "github.com/ipfs/go-log"
@@ -17,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
@@ -117,13 +119,14 @@ func NewService(cfg Config) Alibp2pService {
 	}
 
 	service := &Service{
-		cfg:       cfg,
-		ctx:       cfg.Ctx,
-		homedir:   cfg.Homedir,
-		host:      host,
-		router:    router,
-		bootnodes: bootnodes,
-		notifiee:  new(network.NotifyBundle),
+		cfg:              cfg,
+		ctx:              cfg.Ctx,
+		homedir:          cfg.Homedir,
+		host:             host,
+		router:           router,
+		routingDiscovery: discovery.NewRoutingDiscovery(router),
+		bootnodes:        bootnodes,
+		notifiee:         new(network.NotifyBundle),
 	}
 
 	service.isDirectFn = func(id string) bool {
@@ -171,6 +174,7 @@ func (self *Service) Myid() (id string, addrs []string) {
 func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		defer func() {
+			addCounter(READ)
 			if s != nil {
 				go helpers.FullClose(s)
 			}
@@ -226,10 +230,36 @@ func (self *Service) Connect(url string) error {
 	return self.host.Connect(self.ctx, peer.AddrInfo{ID: peerid, Addrs: []ma.Multiaddr{targetAddr}})
 }
 
+func (self *Service) Advertise(ctx context.Context, ns string) {
+	discovery.Advertise(ctx, self.routingDiscovery, ns)
+}
+
+func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, error) {
+	var (
+		err error
+		ret = make([]string, 0)
+		aCh <-chan peer.AddrInfo
+	)
+	aCh, err = self.routingDiscovery.FindPeers(ctx, ns)
+	if err != nil {
+		return nil, err
+	}
+	err = errors.New("may be timeout")
+	for a := range aCh {
+		if err != nil {
+			err = nil
+		}
+		ret = append(ret, a.ID.Pretty())
+	}
+	return ret, err
+}
+
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
 	return self.sendMsg(to, protocolID, msg, notimeout)
 }
+
 func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peer.ID, network.Stream, int, error) {
+	defer addCounter(SEND)
 	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
@@ -393,10 +423,12 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
+	startCounter(self.ctx)
 	self.host.Network().Notify(self.notifiee)
 	if self.cfg.Discover {
 		self.bootstrap()
 	}
+
 }
 
 func (self *Service) Table() map[string][]string {
