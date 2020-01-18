@@ -21,13 +21,49 @@
 package alibp2p
 
 import (
-	"sync/atomic"
+	"encoding/json"
+	"fmt"
 	"testing"
 )
 
 func TestAddCounter(t *testing.T) {
-	for i:=0;i<100;i++ {
-		addCounter(SEND)
-	}
-	t.Log(atomic.LoadInt64(&totalSend))
+	s := `
+{
+  "alibp2p-counter": {
+    "bw": {
+      "total-in": "643197",
+      "total-out": "5696915",
+      "rate-in": "20.28",
+      "rate-out": "596.35"
+    },
+    "rw": {
+      "total-in": "100219",
+      "total-out": "20147",
+      "avg-in": "3.17",
+      "avg-out": "0.63"
+    },
+    "msg": {
+      "total-in": "9",
+      "total-out": "20084",
+      "avg-in": "0.00",
+      "avg-out": "0.63"
+    }
+  }
+}`
+	m := make(map[string]interface{})
+	err := json.Unmarshal([]byte(s), &m)
+	t.Log(err, m)
+	b, err := json.Marshal(m)
+	t.Log(err, string(b)[1:])
+	h := fmt.Sprintf(`"%s"`, "helloworld")
+	t.Log(h)
+
+	now := "now"
+	ss := `{"a":123"}`
+	bb := []byte(fmt.Sprintf("{\"time\":\"%s\",%s", now, ss[1:]))
+	cc := []byte(fmt.Sprintf(`{"time":"%s",{"details":%s}}`, now, `["a","b"]`))
+	t.Log(bb)
+	t.Log(string(bb))
+	t.Log(cc)
+	t.Log(string(cc))
 }

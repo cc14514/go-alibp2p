@@ -76,6 +76,11 @@ type Config struct {
 //
 // This function consumes the config. Do not reuse it (really!).
 func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
+	a, _, c := cfg.NewNode2(ctx)
+	return a, c
+}
+
+func (cfg *Config) NewNode2(ctx context.Context) (host.Host, metrics.Reporter, error) {
 	// Check this early. Prevents us from even *starting* without verifying this.
 	if pnet.ForcePrivateNetwork && cfg.Protector == nil {
 		log.Error("tried to create a libp2p node with no Private" +
@@ -83,34 +88,35 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 			" is forced by the enviroment")
 		// Note: This is *also* checked the upgrader itself so it'll be
 		// enforced even *if* you don't use the libp2p constructor.
-		return nil, pnet.ErrNotInPrivateNetwork
+		return nil, nil, pnet.ErrNotInPrivateNetwork
 	}
 
 	if cfg.PeerKey == nil {
-		return nil, fmt.Errorf("no peer key specified")
+		return nil, nil, fmt.Errorf("no peer key specified")
 	}
 
 	// Obtain Peer ID from public key
 	pid, err := peer.IDFromPublicKey(cfg.PeerKey.GetPublic())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if cfg.Peerstore == nil {
-		return nil, fmt.Errorf("no peerstore specified")
+		return nil, nil, fmt.Errorf("no peerstore specified")
 	}
 
 	if !cfg.Insecure {
 		if err := cfg.Peerstore.AddPrivKey(pid, cfg.PeerKey); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if err := cfg.Peerstore.AddPubKey(pid, cfg.PeerKey.GetPublic()); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	// TODO: Make the swarm implementation configurable.
-	swrm := swarm.NewSwarm(ctx, pid, cfg.Peerstore, cfg.Reporter)
+	mtr := metrics.NewBandwidthCounter()
+	swrm := swarm.NewSwarm2(ctx, pid, cfg.Peerstore, cfg.Reporter, mtr)
 	if cfg.Filters != nil {
 		swrm.Filters = cfg.Filters
 	}
@@ -124,7 +130,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 
 	if err != nil {
 		swrm.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
 	if cfg.Relay {
@@ -147,20 +153,20 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		upgrader.Secure, err = makeSecurityTransport(h, cfg.SecurityTransports)
 		if err != nil {
 			h.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	upgrader.Muxer, err = makeMuxer(h, cfg.Muxers)
 	if err != nil {
 		h.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
 	tpts, err := makeTransports(h, upgrader, cfg.Transports)
 	if err != nil {
 		h.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
 	// add by liangc
@@ -172,7 +178,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		err = swrm.AddTransport(t)
 		if err != nil {
 			h.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -180,7 +186,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		err := circuit.AddRelayTransport(swrm.Context(), h, upgrader, cfg.RelayOpts...)
 		if err != nil {
 			h.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -196,7 +202,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	err = swrm.AddTransport(muxTransport)
 	if err != nil {
 		h.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, maddr := range cfg.ListenAddrs {
@@ -208,7 +214,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	}
 	if err := h.Network().Listen(normalAddr...); err != nil {
 		h.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Configure routing and autorelay
@@ -217,7 +223,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		router, err = cfg.Routing(h)
 		if err != nil {
 			h.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -225,25 +231,25 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	if muxAddr != nil {
 		if err := h.Network().Listen(muxAddr); err != nil {
 			h.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if cfg.EnableAutoRelay {
 		if !cfg.Relay {
 			h.Close()
-			return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
+			return nil, nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
 		}
 
 		if router == nil {
 			h.Close()
-			return nil, fmt.Errorf("cannot enable autorelay; no routing for discovery")
+			return nil, nil, fmt.Errorf("cannot enable autorelay; no routing for discovery")
 		}
 
 		crouter, ok := router.(routing.ContentRouting)
 		if !ok {
 			h.Close()
-			return nil, fmt.Errorf("cannot enable autorelay; no suitable routing for discovery")
+			return nil, nil, fmt.Errorf("cannot enable autorelay; no suitable routing for discovery")
 		}
 
 		discovery := discovery.NewRoutingDiscovery(crouter)
@@ -268,9 +274,9 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	h.Start()
 
 	if router != nil {
-		return routed.Wrap(h, router), nil
+		return routed.Wrap(h, router), mtr, nil
 	}
-	return h, nil
+	return h, mtr, nil
 }
 
 // Option is a libp2p config option that can be given to the libp2p constructor

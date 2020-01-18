@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
@@ -74,7 +75,11 @@ func NewService(cfg Config) Alibp2pService {
 		list = append(list, listen1)
 		netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
 	}
+
+	bwc := metrics.NewBandwidthCounter()
+	msgc := metrics.NewBandwidthCounter()
 	optlist := []libp2p.Option{
+		libp2p.BandwidthReporter(bwc),
 		libp2p.NATPortMap(),
 		libp2p.ListenAddrs(list...),
 		libp2p.Identity(priv),
@@ -100,7 +105,7 @@ func NewService(cfg Config) Alibp2pService {
 	}
 	optlist = append(optlist, cfg.MuxTransportOption(cfg.Loglevel))
 
-	host, err := libp2p.New(cfg.Ctx, optlist...)
+	host, rwc, err := libp2p.New2(cfg.Ctx, optlist...)
 	if err != nil {
 		panic(err)
 	}
@@ -127,6 +132,9 @@ func NewService(cfg Config) Alibp2pService {
 		routingDiscovery: discovery.NewRoutingDiscovery(router),
 		bootnodes:        bootnodes,
 		notifiee:         new(network.NotifyBundle),
+		bwc:              bwc,
+		rwc:              rwc,
+		msgc:             msgc,
 	}
 
 	service.isDirectFn = func(id string) bool {
@@ -173,8 +181,9 @@ func (self *Service) Myid() (id string, addrs []string) {
 
 func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
+		self.msgc.LogRecvMessage(1)
+		self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 		defer func() {
-			addCounter(READ)
 			if s != nil {
 				go helpers.FullClose(s)
 			}
@@ -194,7 +203,13 @@ func (self *Service) SetHandler(pid string, handler StreamHandler) {
 }
 
 func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {
-	self.host.SetStreamHandler(protocol.ID(protoid), handler)
+	self.host.SetStreamHandler(protocol.ID(protoid), func(a network.Stream) {
+		if a != nil {
+			self.msgc.LogRecvMessage(1)
+			self.msgc.LogRecvMessageStream(1, a.Protocol(), a.Conn().RemotePeer())
+		}
+		handler(a)
+	})
 }
 
 //TODO add by liangc : connMgr protected / unprotected setting
@@ -259,7 +274,12 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 }
 
 func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peer.ID, network.Stream, int, error) {
-	defer addCounter(SEND)
+	defer func() {
+		tid, _ := peer.IDB58Decode(to)
+		self.msgc.LogSentMessage(1)
+		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), tid)
+	}()
+
 	peerid, err := peer.IDB58Decode(to)
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
@@ -423,7 +443,7 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
-	startCounter(self.ctx)
+	startCounter(self)
 	self.host.Network().Notify(self.notifiee)
 	if self.cfg.Discover {
 		self.bootstrap()
@@ -665,4 +685,41 @@ func (self *Service) Unprotect(id, tag string) (bool, error) {
 		return false, err
 	}
 	return self.host.ConnManager().Unprotect(p, tag), nil
+}
+
+func (self *Service) Report(peerids ...string) []byte {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	fn := func(stat, stat2, stat3 metrics.Stats) string {
+		tmp := `{"detail":{"bw":{"total-in":"%d","total-out":"%d","rate-in":"%.2f","rate-out":"%.2f"},"rw":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"},"msg":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"}}}`
+		jsonStr := fmt.Sprintf(tmp,
+			stat.TotalIn, stat.TotalOut, stat.RateIn, stat.RateOut,
+			stat2.TotalIn, stat2.TotalOut, stat2.RateIn, stat2.RateOut,
+			stat3.TotalIn, stat3.TotalOut, stat3.RateIn, stat3.RateOut,
+		)
+		return jsonStr
+	}
+	if peerids == nil {
+		stat := self.bwc.GetBandwidthTotals()
+		stat2 := self.rwc.GetBandwidthTotals()
+		stat3 := self.msgc.GetBandwidthTotals()
+		s := fn(stat, stat2, stat3)
+		return []byte(fmt.Sprintf(`{"time":"%s",%s`, now, s[1:]))
+	} else {
+		rs := ""
+		for _, peerid := range peerids {
+			id, err := peer.IDB58Decode(peerid)
+			if err != nil {
+				return []byte(err.Error())
+			}
+			stat := self.bwc.GetBandwidthForPeer(id)
+			stat2 := self.rwc.GetBandwidthForPeer(id)
+			stat3 := self.msgc.GetBandwidthForPeer(id)
+			s := fn(stat, stat2, stat3)
+			ps := fmt.Sprintf(`"%s":%s`, peerid, s)
+			rs = rs + ps + ","
+		}
+		rs = rs[:len(rs)-1]
+		return []byte(fmt.Sprintf(`{"time":"%s",%s}`, now, rs))
+	}
+	return nil
 }

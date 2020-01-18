@@ -61,7 +61,7 @@ github.com/libp2p/go-buffer-pool
 github.com/libp2p/go-conn-security-multistream
 # github.com/libp2p/go-flow-metrics v0.0.1
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.1.0 => github.com/cc14514/go-libp2p v0.0.0-20191107035444-bf2343196cca
+# github.com/libp2p/go-libp2p v0.1.0 => ../go-libp2p
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/p2p/host/basic
@@ -132,7 +132,7 @@ github.com/libp2p/go-libp2p-routing/notifications
 # github.com/libp2p/go-libp2p-secio v0.1.0
 github.com/libp2p/go-libp2p-secio
 github.com/libp2p/go-libp2p-secio/pb
-# github.com/libp2p/go-libp2p-swarm v0.1.0 => github.com/cc14514/go-libp2p-swarm v0.0.0-20191111121429-bf40e092865b
+# github.com/libp2p/go-libp2p-swarm v0.1.0 => ../go-libp2p-swarm
 github.com/libp2p/go-libp2p-swarm
 # github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 github.com/libp2p/go-libp2p-transport-upgrader

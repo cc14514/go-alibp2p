@@ -66,6 +66,8 @@ func (s *Stream) Read(p []byte) (int, error) {
 	if s.conn.swarm.bwc != nil {
 		s.conn.swarm.bwc.LogRecvMessage(int64(n))
 		s.conn.swarm.bwc.LogRecvMessageStream(int64(n), s.Protocol(), s.Conn().RemotePeer())
+		s.conn.swarm.mtc.LogRecvMessage(1)
+		s.conn.swarm.mtc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 	}
 	// If we observe an EOF, this stream is now closed for reading.
 	// If we're already closed for writing, this stream is now fully closed.
@@ -90,6 +92,8 @@ func (s *Stream) Write(p []byte) (int, error) {
 	if s.conn.swarm.bwc != nil {
 		s.conn.swarm.bwc.LogSentMessage(int64(n))
 		s.conn.swarm.bwc.LogSentMessageStream(int64(n), s.Protocol(), s.Conn().RemotePeer())
+		s.conn.swarm.mtc.LogSentMessage(1)
+		s.conn.swarm.mtc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 	}
 	return n, err
 }

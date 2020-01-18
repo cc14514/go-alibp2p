@@ -83,9 +83,9 @@ type Swarm struct {
 	// filters for addresses that shouldnt be dialed (or accepted)
 	Filters *filter.Filters
 
-	proc goprocess.Process
-	ctx  context.Context
-	bwc  metrics.Reporter
+	proc     goprocess.Process
+	ctx      context.Context
+	bwc, mtc metrics.Reporter
 }
 
 // NewSwarm constructs a Swarm
@@ -94,6 +94,28 @@ func NewSwarm(ctx context.Context, local peer.ID, peers peerstore.Peerstore, bwc
 		local:   local,
 		peers:   peers,
 		bwc:     bwc,
+		Filters: filter.NewFilters(),
+	}
+
+	s.conns.m = make(map[peer.ID][]*Conn)
+	s.listeners.m = make(map[transport.Listener]struct{})
+	s.transports.m = make(map[int]transport.Transport)
+	s.notifs.m = make(map[network.Notifiee]struct{})
+
+	s.dsync = NewDialSync(s.doDial)
+	s.limiter = newDialLimiter(s.dialAddr)
+	s.proc = goprocessctx.WithContextAndTeardown(ctx, s.teardown)
+	s.ctx = goprocessctx.OnClosingContext(s.proc)
+
+	return s
+}
+
+func NewSwarm2(ctx context.Context, local peer.ID, peers peerstore.Peerstore, bwc, mtc metrics.Reporter) *Swarm {
+	s := &Swarm{
+		local:   local,
+		peers:   peers,
+		bwc:     bwc,
+		mtc:     mtc,
 		Filters: filter.NewFilters(),
 	}
 

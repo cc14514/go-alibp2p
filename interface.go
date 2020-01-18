@@ -82,5 +82,30 @@ type (
 		Advertise(ctx context.Context, ns string)
 
 		FindProviders(ctx context.Context, ns string) ([]string, error)
+		/*
+			{
+			  "alibp2p-counter": {
+			    "bw": {
+			      "total-in": "643197",
+			      "total-out": "5696915",
+			      "rate-in": "20.28",
+			      "rate-out": "596.35"
+			    },
+			    "rw": {
+			      "total-in": "100219",
+			      "total-out": "20147",
+			      "avg-in": "3.17",
+			      "avg-out": "0.63"
+			    },
+			    "msg": {
+			      "total-in": "9",
+			      "total-out": "20084",
+			      "avg-in": "0.00",
+			      "avg-out": "0.63"
+			    }
+			  }
+			}
+		*/
+		Report(peerid ...string) []byte
 	}
 )

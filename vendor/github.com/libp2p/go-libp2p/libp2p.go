@@ -2,6 +2,7 @@ package libp2p
 
 import (
 	"context"
+	"github.com/libp2p/go-libp2p-core/metrics"
 
 	config "github.com/libp2p/go-libp2p/config"
 
@@ -69,4 +70,22 @@ func NewWithoutDefaults(ctx context.Context, opts ...Option) (host.Host, error) 
 		return nil, err
 	}
 	return cfg.NewNode(ctx)
+}
+
+func New2(ctx context.Context, opts ...Option) (host.Host, metrics.Reporter, error) {
+	return NewWithoutDefaults2(ctx, append(opts, FallbackDefaults)...)
+}
+
+// NewWithoutDefaults constructs a new libp2p node with the given options but
+// *without* falling back on reasonable defaults.
+//
+// Warning: This function should not be considered a stable interface. We may
+// choose to add required services at any time and, by using this function, you
+// opt-out of any defaults we may provide.
+func NewWithoutDefaults2(ctx context.Context, opts ...Option) (host.Host, metrics.Reporter, error) {
+	var cfg Config
+	if err := cfg.Apply(opts...); err != nil {
+		return nil, nil, err
+	}
+	return cfg.NewNode2(ctx)
 }

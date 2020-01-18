@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -42,6 +43,7 @@ type (
 		cfg              Config
 		notifiee         *network.NotifyBundle
 		isDirectFn       func(id string) bool
+		bwc, rwc, msgc   metrics.Reporter
 	}
 	blankValidator struct{}
 	ConnType       int
