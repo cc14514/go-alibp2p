@@ -443,7 +443,7 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
-	startCounter(self)
+	//startCounter(self)
 	self.host.Network().Notify(self.notifiee)
 	if self.cfg.Discover {
 		self.bootstrap()
