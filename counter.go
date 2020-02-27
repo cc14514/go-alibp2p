@@ -30,7 +30,7 @@ func startCounter(srv *Service) {
 		for {
 			select {
 			case <-srv.ctx.Done():
-			case <-time.After(120 * time.Second):
+			case <-time.After(300 * time.Second):
 				log.Println("alibp2p-counter =", string(srv.Report()))
 			}
 		}

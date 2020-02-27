@@ -179,7 +179,7 @@ func (self *Service) Myid() (id string, addrs []string) {
 	return
 }
 
-func (self *Service) SetHandler(pid string, handler StreamHandler) {
+func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration) {
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		self.msgc.LogRecvMessage(1)
 		self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
@@ -196,10 +196,23 @@ func (self *Service) SetHandler(pid string, handler StreamHandler) {
 			return
 		}
 		pubkeyToEcdsa(pk)
+		if readTimeout > 0 {
+			tot := time.Now().Add(readTimeout)
+			s.SetReadDeadline(tot)
+			defer func() {
+				if s != nil {
+					s.SetReadDeadline(notimeout)
+				}
+			}()
+		}
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
 			log.Println(err)
 		}
 	})
+}
+
+func (self *Service) SetHandler(pid string, handler StreamHandler) {
+	self.SetHandlerWithTimeout(pid, handler, defReadTimeout)
 }
 
 func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {
@@ -216,12 +229,12 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	id, s, _, err := self.SendMsg(to, protocolID, msg)
 	//self.host.ConnManager().Protect(id, "tmp")
-	if s != nil {
-		go helpers.FullClose(s)
-	}
 	if err != nil {
 		self.host.Network().ClosePeer(id)
 		return err
+	}
+	if s != nil {
+		go helpers.FullClose(s)
 	}
 	//self.host.ConnManager().Unprotect(id, "tmp")
 	return nil
@@ -246,6 +259,20 @@ func (self *Service) Connect(url string) error {
 }
 
 func (self *Service) Advertise(ctx context.Context, ns string) {
+	/*
+		这里使用了 DHT 实现的接口
+		代码：github.com/cc14514/go-libp2p-kad-dht/providers/providers.go
+		GC 规则 :
+			24 小时清理一次， Advertise 会每隔 3 小时汇报一次，以免被 GC
+			...
+				case gcTime.Sub(t) > ProvideValidity: // ProvideValidity = 24H , 意思是 key 的 有效期是 24 小时
+				// or expired
+				err = pm.dstore.Delete(ds.RawKey(res.Key))
+				if err != nil && err != ds.ErrNotFound {
+					log.Warning("failed to remove provider record from disk: ", err)
+				}
+			...
+	*/
 	discovery.Advertise(ctx, self.routingDiscovery, ns)
 }
 
@@ -270,7 +297,8 @@ func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, er
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
-	return self.sendMsg(to, protocolID, msg, notimeout)
+	//return self.sendMsg(to, protocolID, msg, notimeout)
+	return self.sendMsg(to, protocolID, msg, time.Now().Add(defWriteTimeout))
 }
 
 func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peer.ID, network.Stream, int, error) {
@@ -443,7 +471,7 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
-	//startCounter(self)
+	startCounter(self)
 	self.host.Network().Notify(self.notifiee)
 	if self.cfg.Discover {
 		self.bootstrap()
