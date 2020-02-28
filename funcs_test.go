@@ -22,11 +22,13 @@ package alibp2p
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"io"
 	"net"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -133,4 +135,67 @@ func TestTimeout(t *testing.T) {
 	n, err = conn.Write([]byte("hi"))
 	fmt.Println("<-- Write 1 : done", n, err)
 	time.Sleep(time.Second)
+}
+
+type (
+	Msg struct {
+		Id      string
+		Type    int
+		Payload []byte
+	}
+	Payload1 struct {
+		Name, Address string
+	}
+)
+
+func TestEncoder(t *testing.T) {
+
+	p := &Payload1{
+		Name:    "Hello",
+		Address: "Beijing",
+	}
+	msg := &Msg{
+		Id:      "123",
+		Type:    1,
+		Payload: MustToBytes(p),
+	}
+	mb, err := ToBytes(msg)
+	t.Log("msg1", err, mb)
+	t.Log("p1", p)
+
+	msg2 := new(Msg)
+	err = FromBytes(mb, msg2)
+	t.Log("msg2", err, msg2)
+	p2 := new(Payload1)
+	FromBytes(msg2.Payload, p2)
+	t.Log("p2", p2)
+	var i interface{} = p
+	i = "a"
+	_i := Payload1{
+		Name:    "a",
+		Address: "b",
+	}
+	rtn, err := ToBytes(_i)
+	t.Log(err, rtn)
+	rtn, err = ToBytes(&_i)
+	t.Log(err, rtn)
+
+	_j := Payload1{}
+	err = FromBytes(rtn, &_j)
+	t.Log(err, _j)
+
+	tp := reflect.TypeOf(i)
+	t.Log(tp.Kind(), tp.Kind() == reflect.Ptr)
+
+	now := time.Now()
+	for a := 0; a < 100000; a++ {
+		MustToBytes(msg)
+	}
+	fmt.Println("amino", time.Since(now), len(MustToBytes(msg)))
+	now = time.Now()
+	for a := 0; a < 100000; a++ {
+		json.Marshal(msg)
+	}
+	_jr, _ := json.Marshal(msg)
+	fmt.Println("json", time.Since(now), len(_jr))
 }

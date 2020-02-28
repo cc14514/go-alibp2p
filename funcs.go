@@ -15,6 +15,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/tendermint/go-amino"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -272,4 +274,29 @@ var (
 		return wg
 	}
 
+	FromBytes = func(data []byte, ptr interface{}) error {
+		return amino.UnmarshalBinaryLengthPrefixed(data, ptr)
+	}
+	FromReader = func(rw io.ReadWriter, ptr interface{}, maxSize ...int64) (int64, error) {
+		var _maxsize int64 = 5 * 1024 * 1024
+		if maxSize != nil && len(maxSize) > 0 {
+			_maxsize = maxSize[0]
+		}
+		return amino.UnmarshalBinaryLengthPrefixedReader(rw, ptr, _maxsize)
+	}
+
+	ToBytes = func(ptr interface{}) ([]byte, error) {
+		return amino.MarshalBinaryLengthPrefixed(ptr)
+	}
+	ToWriter = func(rw io.ReadWriter, ptr interface{}) (int64, error) {
+		return amino.MarshalBinaryLengthPrefixedWriter(rw, ptr)
+	}
+
+	MustFromBytes = func(data []byte, ptr interface{}) {
+		amino.MustUnmarshalBinaryLengthPrefixed(data, ptr)
+	}
+
+	MustToBytes = func(ptr interface{}) []byte {
+		return amino.MustMarshalBinaryLengthPrefixed(ptr)
+	}
 )
