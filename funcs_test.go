@@ -21,6 +21,7 @@
 package alibp2p
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -198,4 +199,34 @@ func TestEncoder(t *testing.T) {
 	}
 	_jr, _ := json.Marshal(msg)
 	fmt.Println("json", time.Since(now), len(_jr))
+}
+
+type _rw struct {
+	reader *bytes.Buffer
+}
+
+func (r *_rw) Read(p []byte) (n int, err error) {
+	i, err := r.reader.Read(p)
+	fmt.Println(i, err)
+	if i > 0 {
+		return i, err
+	}
+	d := "1234567890"
+	r.reader.Write([]byte(d))
+	return r.reader.Read(p)
+}
+
+func (r *_rw) Write(p []byte) (n int, err error) {
+	panic("implement me")
+}
+
+func Test_rw(t *testing.T) {
+	rw := &_rw{
+		reader: new(bytes.Buffer),
+	}
+	buf := make([]byte, 128)
+	i, err := rw.Read(buf)
+	t.Log(i, err, buf)
+	i, err = rw.Read(buf)
+	t.Log(i, err, buf)
 }

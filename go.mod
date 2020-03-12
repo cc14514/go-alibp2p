@@ -15,6 +15,7 @@ require (
 	github.com/libp2p/go-libp2p-mplex v0.2.1
 	github.com/libp2p/go-libp2p-pnet v0.1.0
 	github.com/libp2p/go-libp2p-yamux v0.2.0
+	github.com/libp2p/go-stream-muxer v0.0.1
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/tendermint/go-amino v0.0.0-20200130113325-59d50ef176f6
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc

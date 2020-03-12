@@ -21,13 +21,13 @@
 package alibp2p
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
-	streammux "github.com/libp2p/go-stream-muxer"
-	"io"
+	"io/ioutil"
 	"log"
 	"strings"
 	"sync"
@@ -35,9 +35,11 @@ import (
 
 type (
 	reuse_conn struct {
-		ctx context.Context
-		rCh chan *RawData
-		wCh chan *RawData
+		ctx    context.Context
+		reader *bytes.Buffer
+		writer *bytes.Buffer
+		//rCh    chan *RawData
+		//wCh chan *RawData
 	}
 	StreamKey    string
 	SessionKey   string
@@ -75,22 +77,31 @@ var (
 )
 
 func (a *reuse_conn) Read(p []byte) (int, error) {
+	i, err := a.reader.Read(p)
+	return i, err
+	/*if i > 0 {
+		return i, err
+	}
 	select {
 	case <-a.ctx.Done():
 		return 0, streammux.ErrReset
 	case req := <-a.rCh:
-		copy(p, req.Data)
-		return req.Len(), io.EOF
-	}
+		a.reader.Write(req.Data)
+		i, err = a.reader.Read(p)
+		fmt.Println("RRRRR--1", i, err, "::", p, "::", req.Data)
+		return i, err
+	}*/
 }
 
 func (a *reuse_conn) Write(p []byte) (int, error) {
-	select {
-	case <-a.ctx.Done():
-		return 0, streammux.ErrReset
-	case a.wCh <- &RawData{Data: p}:
-		return len(p), nil
-	}
+	return a.writer.Write(p)
+	/*
+		select {
+		case <-a.ctx.Done():
+			return 0, streammux.ErrReset
+		case a.wCh <- &RawData{Data: p}:
+			return len(p), nil
+		}*/
 }
 
 func newStreamKey(to, protoid string) StreamKey { return StreamKey(protoid + "@" + to) }
@@ -163,7 +174,7 @@ func (p *AStreamCache) Get(to, protoid string) (network.Stream, bool) {
 		return nil, false
 	}
 	for _, v := range sm {
-		log.Println("AStreamCache-get", "id", to, "protoid", protoid, "asc.len", len(p.pool))
+		//log.Println("AStreamCache-get", "id", to, "protoid", protoid, "asc.len", len(p.pool))
 		return v, true
 	}
 	return nil, false
@@ -186,7 +197,7 @@ func (p *AStreamCache) Put(s network.Stream, opts ...interface{}) {
 	}
 	sm[sessionkey] = s
 	p.pool[streamkey] = sm
-	log.Println("AStreamCache-put", "id", streamkey.Id(), "protoid", streamkey.Protoid(), "session", sessionkey, "asc.len", len(p.pool))
+	//log.Println("AStreamCache-put", "id", streamkey.Id(), "protoid", streamkey.Protoid(), "session", sessionkey, "asc.len", len(p.pool))
 }
 
 func (p *AStreamCache) Has(pid string) bool {
@@ -213,10 +224,13 @@ func (p *AStreamCache) HandleStream(s network.Stream) {
 		sid         = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
 		pk, _       = id2pubkey(s.Conn().RemotePeer())
 		ctx, cancel = context.WithCancel(context.Background())
+		wCh         = make(chan *RawData)
 		rw          = &reuse_conn{
-			ctx: ctx,
-			rCh: make(chan *RawData),
-			wCh: make(chan *RawData),
+			ctx:    ctx,
+			reader: new(bytes.Buffer),
+			writer: new(bytes.Buffer),
+			//rCh:    make(chan *RawData),
+			//wCh: make(chan *RawData),
 		}
 		wg = new(sync.WaitGroup)
 	)
@@ -236,27 +250,41 @@ func (p *AStreamCache) HandleStream(s network.Stream) {
 			if err != nil {
 				log.Println("HandleStream_reader__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
 				cancel()
+			} else if _, err = rw.reader.Write(req.Data); err != nil {
+				log.Println("HandleStream_reader__error__close-2", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
+				cancel()
 			} else {
-				log.Println("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
+				//log.Println("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
 				go func() {
 					if err := handlerFn(sid, pubkeyToEcdsa(pk), rw); err != nil {
-						log.Println("HandleStream_handlerFn__error__close", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
+						log.Println("HandleStream_handlerFn__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
 						cancel()
+						return
+					}
+					ret, err := ioutil.ReadAll(rw.writer)
+					if err != nil {
+						log.Println("HandleStream_handlerFn__error__close-2", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
+						cancel()
+						return
+					}
+					select {
+					case <-ctx.Done():
+					case wCh <- NewRawData(ret):
 					}
 				}()
 			}
-
 			select {
-			case rw.rCh <- req:
-				p.msgc.LogRecvMessage(1)
-				p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+			//case rw.rCh <- req:
+			//	p.msgc.LogRecvMessage(1)
+			//	p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 			case <-ctx.Done():
 				return
+			default:
+				p.msgc.LogRecvMessage(1)
+				p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 			}
 		}
 	}()
-
-	log.Println("Reader start", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
 	go func() {
 		defer func() {
 			log.Println("reuse stream stop writer : ", pid+"@"+s.Conn().RemotePeer().Pretty())
@@ -266,7 +294,7 @@ func (p *AStreamCache) HandleStream(s network.Stream) {
 			select {
 			case <-ctx.Done():
 				return
-			case rsp := <-rw.wCh:
+			case rsp := <-wCh:
 				_, err := ToWriter(s, rsp)
 				if err != nil {
 					log.Println("HandleStream_writer__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), err)
