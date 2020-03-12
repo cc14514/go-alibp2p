@@ -131,7 +131,7 @@ func NewService(cfg Config) Alibp2pService {
 		router:           router,
 		routingDiscovery: discovery.NewRoutingDiscovery(router),
 		bootnodes:        bootnodes,
-		notifiee:         new(network.NotifyBundle),
+		notifiee:         make([]*network.NotifyBundle, 0),
 		bwc:              bwc,
 		rwc:              rwc,
 		msgc:             msgc,
@@ -145,6 +145,14 @@ func NewService(cfg Config) Alibp2pService {
 			}
 		}
 		return false
+	}
+
+	if cfg.ReuseStream {
+		service.asc = NewAStreamCatch(msgc)
+		service.OnDisconnected(func(sessionId string, pubKey *ecdsa.PublicKey) {
+			id, _ := ECDSAPubEncode(pubKey)
+			service.asc.Del2(id, "", "")
+		})
 	}
 
 	return service
@@ -180,6 +188,7 @@ func (self *Service) Myid() (id string, addrs []string) {
 }
 
 func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration) {
+	self.checkReuse(pid)
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		self.msgc.LogRecvMessage(1)
 		self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
@@ -211,11 +220,23 @@ func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, re
 	})
 }
 
+func (self *Service) SetHandlerReuseStream(pid string, handler StreamHandler) {
+	self.asc.Reg(pid, handler)
+	self.host.SetStreamHandler(protocol.ID(pid), self.asc.HandleStream)
+}
+
+func (self *Service) checkReuse(pid string) {
+	if self.asc.Has(pid) {
+		panic("ReuseStream model just provid : SetHandlerReuseStream(string,ReuseStreamHandler)")
+	}
+}
+
 func (self *Service) SetHandler(pid string, handler StreamHandler) {
-	self.SetHandlerWithTimeout(pid, handler, defReadTimeout)
+	self.SetHandlerWithTimeout(pid, handler, 0)
 }
 
 func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {
+	self.checkReuse(protoid)
 	self.host.SetStreamHandler(protocol.ID(protoid), func(a network.Stream) {
 		if a != nil {
 			self.msgc.LogRecvMessage(1)
@@ -233,7 +254,7 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 		self.host.Network().ClosePeer(id)
 		return err
 	}
-	if s != nil {
+	if s != nil && !self.asc.Has(protocolID) {
 		go helpers.FullClose(s)
 	}
 	//self.host.ConnManager().Unprotect(id, "tmp")
@@ -297,18 +318,38 @@ func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, er
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
-	//return self.sendMsg(to, protocolID, msg, notimeout)
-	return self.sendMsg(to, protocolID, msg, time.Now().Add(defWriteTimeout))
+	return self.sendMsg(to, protocolID, msg, notimeout)
+	//return self.sendMsg(to, protocolID, msg, time.Now().Add(defWriteTimeout))
 }
 
-func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peer.ID, network.Stream, int, error) {
+func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (
+	peerid peer.ID,
+	s network.Stream,
+	total int,
+	err error) {
 	defer func() {
 		tid, _ := peer.IDB58Decode(to)
 		self.msgc.LogSentMessage(1)
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), tid)
 	}()
 
-	peerid, err := peer.IDB58Decode(to)
+	if self.asc.Has(protocolID) {
+		ok := false
+		if s, ok = self.asc.Get(to, protocolID); ok {
+			var _total int64
+			_total, err = ToWriter(s, &RawData{Data: msg})
+			if err != nil {
+				log.Println("sendMsg-reuse-stream-error-1", "err", err)
+				self.asc.Del2(to, protocolID, "")
+			} else {
+				total = int(_total)
+				//self.asc.HandleStream(s)
+			}
+			return
+		}
+	}
+
+	peerid, err = peer.IDB58Decode(to)
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
 		if err != nil {
@@ -340,22 +381,39 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	}
 
-	s, err := self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
+	s, err = self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
 	if err != nil {
 		log.Println(err)
 		return peerid, nil, 0, err
 	}
-	var total int
+
 	if notimeout != timeout {
 		s.SetWriteDeadline(timeout)
 		defer s.SetWriteDeadline(notimeout)
 	}
-	total, err = s.Write(msg)
-	if err != nil {
-		log.Println(err)
-		return peerid, nil, total, err
+
+	if self.asc.Has(protocolID) {
+		fmt.Println("1111111111")
+		var _total int64
+		_total, err = ToWriter(s, &RawData{Data: msg})
+		if err != nil {
+			log.Println("sendMsg-reuse-stream-error-2", "err", err)
+			return
+		} else {
+			total = int(_total)
+			fmt.Println("222222222", total)
+		}
+		self.asc.Put(s)
+		//self.asc.HandleStream(s)
+	} else {
+		total, err = s.Write(msg)
+		fmt.Println("3333333333333", total, err)
+		if err != nil {
+			log.Println("sendMsg-reuse-stream-error-3", "err", err)
+		}
 	}
-	return peerid, s, total, nil
+
+	return
 }
 
 func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
@@ -389,47 +447,49 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 }
 
 func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEvent) {
-	//self.SetStreamHandler()
-	self.notifiee.ConnectedF = func(i network.Network, conn network.Conn) {
-		switch t {
-		case CONNT_TYPE_DIRECT:
-			if !self.isDirectFn(conn.RemotePeer().Pretty()) {
-				return
+	self.notifiee = append(self.notifiee, &network.NotifyBundle{
+		ConnectedF: func(i network.Network, conn network.Conn) {
+			switch t {
+			case CONNT_TYPE_DIRECT:
+				if !self.isDirectFn(conn.RemotePeer().Pretty()) {
+					return
+				}
+			case CONN_TYPE_RELAY:
+				if self.isDirectFn(conn.RemotePeer().Pretty()) {
+					return
+				}
+			case CONN_TYPE_ALL:
 			}
-		case CONN_TYPE_RELAY:
-			if self.isDirectFn(conn.RemotePeer().Pretty()) {
-				return
+			var (
+				in     bool
+				pk, _  = id2pubkey(conn.RemotePeer())
+				sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+				pubkey = pubkeyToEcdsa(pk)
+				preRtn []byte
+			)
+			switch conn.Stat().Direction {
+			case network.DirInbound:
+				in = true
+			case network.DirOutbound:
+				in = false
 			}
-		case CONN_TYPE_ALL:
-		}
-		var (
-			in     bool
-			pk, _  = id2pubkey(conn.RemotePeer())
-			sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-			pubkey = pubkeyToEcdsa(pk)
-			preRtn []byte
-		)
-		switch conn.Stat().Direction {
-		case network.DirInbound:
-			in = true
-		case network.DirOutbound:
-			in = false
-		}
-		// 连出去的，并且 preMsg 有值，就给对方发消息
-		if !in && preMsg != nil {
-			proto, pkg := preMsg()
-			resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 2*time.Second)
-			if err == nil {
-				preRtn = resp
-			} else {
-				preRtn = append(make([]byte, 8), []byte(err.Error())...)
+			// 连出去的，并且 preMsg 有值，就给对方发消息
+			if !in && preMsg != nil {
+				proto, pkg := preMsg()
+				resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 3*time.Second)
+				if err == nil {
+					preRtn = resp
+				} else {
+					preRtn = append(make([]byte, 8), []byte(err.Error())...)
+				}
 			}
-		}
-		callbackFn(in, sid, pubkey, preRtn)
-	}
+			callbackFn(in, sid, pubkey, preRtn)
+		},
+	})
 }
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
+	var buf []byte
 	tot := notimeout
 	if timeout > 0 {
 		tot = time.Now().Add(timeout)
@@ -444,15 +504,25 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 		defer func() {
 			if s != nil {
 				s.SetReadDeadline(notimeout)
-				helpers.FullClose(s)
+				if !self.asc.Has(proto) {
+					helpers.FullClose(s)
+				}
 			}
 		}()
-		buf, err := ioutil.ReadAll(s)
-		if err == nil {
-			return buf, nil
+
+		if self.asc.Has(proto) {
+			rsp := new(RawData)
+			if _, err = FromReader(s, rsp); err != nil {
+				return nil, err
+			}
+			buf = rsp.Data
+		} else {
+			if buf, err = ioutil.ReadAll(s); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return nil, err
+	return buf, err
 }
 
 func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
@@ -460,19 +530,23 @@ func (self *Service) Request(to, proto string, pkg []byte) ([]byte, error) {
 }
 
 func (self *Service) OnDisconnected(callback DisconnectEvent) {
-	self.notifiee.DisconnectedF = func(i network.Network, conn network.Conn) {
-		pk, _ := id2pubkey(conn.RemotePeer())
-		for _, c := range i.Conns() {
-			c.RemotePeer()
-		}
-		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		callback(sid, pubkeyToEcdsa(pk))
-	}
+	self.notifiee = append(self.notifiee, &network.NotifyBundle{
+		DisconnectedF: func(i network.Network, conn network.Conn) {
+			pk, _ := id2pubkey(conn.RemotePeer())
+			for _, c := range i.Conns() {
+				c.RemotePeer()
+			}
+			sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+			callback(sid, pubkeyToEcdsa(pk))
+		},
+	})
 }
 
 func (self *Service) Start() {
 	startCounter(self)
-	self.host.Network().Notify(self.notifiee)
+	for _, notify := range self.notifiee {
+		self.host.Network().Notify(notify)
+	}
 	if self.cfg.Discover {
 		self.bootstrap()
 	}

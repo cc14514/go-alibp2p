@@ -30,7 +30,12 @@ import (
 )
 
 type (
-	StreamHandler   func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error
+	StreamHandler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error
+
+	//ReuseStreamReader  func() (*RawData, error)
+	//ReuseStreamWriter  func(*RawData) error
+	//ReuseStreamHandler func(ctx context.Context, sessionId string, pubkey *ecdsa.PublicKey, r ReuseStreamReader, w ReuseStreamWriter) error
+
 	PreMsg          func() (string, []byte)
 	ConnectEvent    func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, preRtn []byte)
 	DisconnectEvent func(sessionId string, pubKey *ecdsa.PublicKey)
@@ -50,6 +55,7 @@ type (
 		SetBootnode(peer ...string) error
 		SetHandler(pid string, handler StreamHandler)
 		SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration)
+		SetHandlerReuseStream(pid string, handler StreamHandler)
 
 		SendMsgAfterClose(to, protocolID string, msg []byte) error
 		Request(to, proto string, msg []byte) ([]byte, error)

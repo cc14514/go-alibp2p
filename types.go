@@ -19,6 +19,10 @@ import (
 )
 
 type (
+	RawData struct {
+		Data []byte
+	}
+
 	SimplePacketHead []byte
 
 	Config struct {
@@ -26,7 +30,7 @@ type (
 		Homedir                                string
 		Port, ConnLow, ConnHi, BootstrapPeriod uint64
 		Bootnodes                              []string
-		Discover                               bool
+		Discover, ReuseStream                  bool
 		Networkid, MuxPort                     *big.Int
 
 		PrivKey  *ecdsa.PrivateKey
@@ -41,14 +45,14 @@ type (
 		routingDiscovery *discovery.RoutingDiscovery
 		bootnodes        []peer.AddrInfo
 		cfg              Config
-		notifiee         *network.NotifyBundle
+		notifiee         []*network.NotifyBundle
 		isDirectFn       func(id string) bool
 		bwc, rwc, msgc   metrics.Reporter
+		asc              *AStreamCache
 	}
 	blankValidator struct{}
 	ConnType       int
-
-	asyncFn struct {
+	asyncFn        struct {
 		fn   func(context.Context, []interface{})
 		args []interface{}
 	}
@@ -63,6 +67,10 @@ type (
 		gc                time.Duration
 	}
 )
+
+func NewRawData(data []byte) *RawData {
+	return &RawData{Data: data}
+}
 
 func ReadSimplePacketHead(r io.Reader) (SimplePacketHead, error) {
 	head := make([]byte, 6)
@@ -98,3 +106,5 @@ func (header SimplePacketHead) Decode() (msgType uint16, size uint32, err error)
 
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
 func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
+
+func (d *RawData) Len() int { return len(d.Data) }

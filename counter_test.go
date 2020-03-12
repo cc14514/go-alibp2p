@@ -67,3 +67,8 @@ func TestAddCounter(t *testing.T) {
 	t.Log(cc)
 	t.Log(string(cc))
 }
+
+func TestPool(t *testing.T) {
+	var asc AStreamCache
+	t.Log(asc.Has("hello"))
+}
