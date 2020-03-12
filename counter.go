@@ -21,7 +21,7 @@
 package alibp2p
 
 import (
-	"log"
+	"fmt"
 	"time"
 )
 
@@ -31,7 +31,7 @@ func startCounter(srv *Service) {
 			select {
 			case <-srv.ctx.Done():
 			case <-time.After(300 * time.Second):
-				log.Println("alibp2p-counter =", string(srv.Report()))
+				fmt.Println("alibp2p-counter =", string(srv.Report()))
 			}
 		}
 	}()

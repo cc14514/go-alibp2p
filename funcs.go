@@ -18,7 +18,6 @@ import (
 	"github.com/tendermint/go-amino"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/big"
 	"os"
 	"path"
@@ -121,7 +120,7 @@ func (a *AsyncRunner) Apply(fn func(ctx context.Context, args []interface{}), ar
 var (
 	loadid = func(homedir string) (crypto.PrivKey, error) {
 		keypath := path.Join(homedir, "p2p.id")
-		log.Println("keypath", keypath)
+		log.Debug("keypath", keypath)
 		buff1, err := ioutil.ReadFile(keypath)
 		if err != nil {
 			err := os.MkdirAll(homedir, 0755)
@@ -167,15 +166,15 @@ var (
 			wg.Add(1)
 			go func(p peer.AddrInfo) {
 				defer wg.Done()
-				log.Printf("from %s connecting to %s : %v", ph.ID().Pretty(), p.ID, p.Addrs)
+				log.Debugf("from %s connecting to %s : %v", ph.ID().Pretty(), p.ID, p.Addrs)
 				ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 				if err := ph.Connect(ctx, p); err != nil {
-					//log.Println("connect failed", p.ID)
+					//log.Debug("connect failed", p.ID)
 					//log.Printf("failed to connect with %v: %s", p.ID, err)
 					errs <- err
 					return
 				}
-				log.Println("connect success :", p.ID.Pretty())
+				log.Debug("connect success :", p.ID.Pretty())
 			}(p)
 		}
 		wg.Wait()
@@ -199,7 +198,7 @@ var (
 			maddr := ma.StringCast(addr)
 			p, err := peer.AddrInfoFromP2pAddr(maddr)
 			if err != nil {
-				log.Println(err)
+				log.Debug(err)
 				return nil, err
 			}
 			pinfos[i] = *p

@@ -26,11 +26,13 @@ import (
 	gologging "github.com/whyrusleeping/go-logging"
 	"golang.org/x/xerrors"
 	"io/ioutil"
-	"log"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
+
+var log = golog.Logger("alibp2p")
 
 func NewService(cfg Config) Alibp2pService {
 	switch cfg.Loglevel {
@@ -45,7 +47,7 @@ func NewService(cfg Config) Alibp2pService {
 	default:
 		golog.SetAllLoggers(gologging.ERROR)
 	}
-	log.Println("alibp2p.NewService", cfg)
+	log.Debug("alibp2p.NewService", cfg)
 
 	var (
 		err             error
@@ -113,7 +115,7 @@ func NewService(cfg Config) Alibp2pService {
 	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
 		full := addr.Encapsulate(hostAddr)
-		log.Println(i, "listen on", full)
+		log.Debug(i, "listen on", full)
 	}
 
 	if cfg.Bootnodes != nil && len(cfg.Bootnodes) > 0 {
@@ -127,6 +129,7 @@ func NewService(cfg Config) Alibp2pService {
 		cfg:              cfg,
 		ctx:              cfg.Ctx,
 		homedir:          cfg.Homedir,
+		requestLock:      new(sync.Mutex),
 		host:             host,
 		router:           router,
 		routingDiscovery: discovery.NewRoutingDiscovery(router),
@@ -201,7 +204,7 @@ func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, re
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
 		pk, err := id2pubkey(s.Conn().RemotePeer())
 		if err != nil {
-			log.Println(err)
+			log.Debug(err)
 			return
 		}
 		pubkeyToEcdsa(pk)
@@ -215,7 +218,7 @@ func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, re
 			}()
 		}
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
-			log.Println(err)
+			log.Debug(err)
 		}
 	})
 }
@@ -339,7 +342,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
-				log.Println("sendMsg-reuse-stream-error-1", "err", err)
+				log.Debug("sendMsg-reuse-stream-error-1", "err", err)
 				self.asc.Del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -353,18 +356,18 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
 		if err != nil {
-			log.Println(err)
+			log.Debug(err)
 			return peerid, nil, 0, err
 		}
 
 		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
 		if err != nil {
-			log.Println(err)
+			log.Debug(err)
 			return peerid, nil, 0, err
 		}
 		peerid, err = peer.IDB58Decode(pid)
 		if err != nil {
-			log.Println(err)
+			log.Debug(err)
 			return peerid, nil, 0, err
 		}
 		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
@@ -375,7 +378,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	} else {
 		pi, err := self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
-			log.Println(err)
+			log.Debug(err)
 			return peerid, nil, 0, err
 		}
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
@@ -383,7 +386,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	s, err = self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
 	if err != nil {
-		log.Println(err)
+		log.Debug(err)
 		return peerid, nil, 0, err
 	}
 
@@ -397,7 +400,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
-			log.Println("sendMsg-reuse-stream-error-2", "err", err)
+			log.Debug("sendMsg-reuse-stream-error-2", "err", err)
 			return
 		} else {
 			total = int(_total)
@@ -409,7 +412,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		total, err = s.Write(msg)
 		//fmt.Println("3333333333333", total, err)
 		if err != nil {
-			log.Println("sendMsg-reuse-stream-error-3", "err", err)
+			log.Debug("sendMsg-reuse-stream-error-3", "err", err)
 		}
 	}
 
@@ -419,27 +422,27 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	id, err := peer.IDFromPublicKey(ecdsaToPubkey(pubkey))
 	if err != nil {
-		log.Println("PreConnect-error-1", "id", id.Pretty(), "err", err)
+		log.Debug("PreConnect-error-1", "id", id.Pretty(), "err", err)
 		return err
 	}
 	pi, err := self.findpeer(id.Pretty())
 	if err != nil {
-		log.Println("PreConnect-error-2", "id", id.Pretty(), "err", err)
+		log.Debug("PreConnect-error-2", "id", id.Pretty(), "err", err)
 		return err
 	}
 	ctx := context.WithValue(self.ctx, "nodelay", "true")
 	err = connectFn(ctx, self.host, []peer.AddrInfo{pi})
 	if err != nil {
-		log.Println("PreConnect-error-3", "id", id.Pretty(), "err", err)
+		log.Debug("PreConnect-error-3", "id", id.Pretty(), "err", err)
 		return err
 	}
-	log.Println("PreConnect-success : protected", "id", id.Pretty())
+	log.Debug("PreConnect-success : protected", "id", id.Pretty())
 	self.host.ConnManager().Protect(id, "pre")
 	go func(ctx context.Context, id peer.ID) {
 		select {
 		case <-time.After(peerstore.TempAddrTTL / 4):
 			ok := self.host.ConnManager().Unprotect(id, "pre")
-			log.Println("PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
+			log.Debug("PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
 		case <-ctx.Done():
 		}
 	}(ctx, id)
@@ -489,11 +492,14 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 }
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
+	self.requestLock.Lock()
+	defer self.requestLock.Unlock()
 	var buf []byte
 	tot := notimeout
 	if timeout > 0 {
 		tot = time.Now().Add(timeout)
 	}
+
 	_, s, _, err := self.sendMsg(to, proto, pkg, tot)
 	if err == nil {
 		if tot != notimeout {
@@ -673,11 +679,11 @@ func (self *Service) Get(k string) ([]byte, error) {
 func (self *Service) BootstrapOnce() error {
 	err := connectFn(self.ctx, self.host, self.bootnodes)
 	if err != nil {
-		log.Println("bootstrap-once-conn-error", "err", err)
+		log.Debug("bootstrap-once-conn-error", "err", err)
 	}
 	err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
 	if err != nil {
-		log.Println("bootstrap-once-query-error", "err", err)
+		log.Debug("bootstrap-once-query-error", "err", err)
 	}
 	return err
 }
@@ -687,11 +693,11 @@ func (self *Service) bootstrap() error {
 	if self.cfg.BootstrapPeriod > period {
 		period = self.cfg.BootstrapPeriod
 	}
-	log.Println("host-addrs", self.host.Addrs())
-	log.Println("host-network-listen", self.host.Network().ListenAddresses())
-	log.Println("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
+	log.Debug("host-addrs", self.host.Addrs())
+	log.Debug("host-network-listen", self.host.Network().ListenAddresses())
+	log.Debug("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
 	go func() {
-		log.Println("loopboot-start", "period", period)
+		log.Debug("loopboot-start", "period", period)
 		if atomic.CompareAndSwapInt32(&loopboot, 0, 1) {
 			defer func() {
 				atomic.StoreInt32(&loopboot, 0)
@@ -710,18 +716,18 @@ func (self *Service) bootstrap() error {
 							others = self.peersWithoutBootnodes()
 							total  = len(others)
 						)
-						log.Println("bootstrap looping")
+						log.Debug("bootstrap looping")
 						err := connectFn(self.ctx, self.host, self.bootnodes)
 						if err == nil {
-							log.Println("bootstrap success")
+							log.Debug("bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
-								log.Println("Bootstrap the host")
+								log.Debug("Bootstrap the host")
 								err = self.router.Bootstrap(self.ctx)
 								if err != nil {
-									log.Println("bootstrap-error", "err", err)
+									log.Debug("bootstrap-error", "err", err)
 								}
 							} else {
-								log.Println("Reconnected and bootstrap the host once")
+								log.Debug("Reconnected and bootstrap the host once")
 								self.BootstrapOnce()
 							}
 						} else if total > 0 {
@@ -730,14 +736,14 @@ func (self *Service) bootstrap() error {
 							}
 							tasks := randPeers(others, limit)
 							err := connectFn(self.ctx, self.host, tasks)
-							log.Println("bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
+							log.Debug("bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
 						}
 					}
 				}
 				timer.Reset(time.Duration(period) * time.Second)
 			}
 		}
-		log.Println("loopboot-end")
+		log.Debug("loopboot-end")
 	}()
 	return nil
 }

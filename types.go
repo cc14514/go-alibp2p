@@ -34,7 +34,7 @@ type (
 		Networkid, MuxPort                     *big.Int
 
 		PrivKey  *ecdsa.PrivateKey
-		Loglevel int // 3 INFO, 4 DEBUG, 5 TRACE
+		Loglevel int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 NOTICE , 5 DEBUG
 	}
 
 	Service struct {
@@ -49,6 +49,7 @@ type (
 		isDirectFn       func(id string) bool
 		bwc, rwc, msgc   metrics.Reporter
 		asc              *AStreamCache
+		requestLock      *sync.Mutex
 	}
 	blankValidator struct{}
 	ConnType       int
