@@ -393,7 +393,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	}
 
 	if self.asc.Has(protocolID) {
-		fmt.Println("1111111111")
+		//fmt.Println("1111111111")
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
@@ -401,13 +401,13 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			return
 		} else {
 			total = int(_total)
-			fmt.Println("222222222", total)
+			//fmt.Println("222222222", total)
 		}
 		self.asc.Put(s)
 		//self.asc.HandleStream(s)
 	} else {
 		total, err = s.Write(msg)
-		fmt.Println("3333333333333", total, err)
+		//fmt.Println("3333333333333", total, err)
 		if err != nil {
 			log.Println("sendMsg-reuse-stream-error-3", "err", err)
 		}
