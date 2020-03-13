@@ -44,10 +44,11 @@ type (
 	SessionKey   string
 	AStreamCache struct {
 		// { aconnkey -> { session -> conn } }
-		pool map[StreamKey]map[SessionKey]network.Stream
-		reg  map[string]StreamHandler
-		lock *sync.RWMutex
-		msgc metrics.Reporter
+		pool    map[StreamKey]map[SessionKey]network.Stream
+		reg     map[string]StreamHandler
+		reglock map[string]*sync.Mutex
+		lock    *sync.RWMutex
+		msgc    metrics.Reporter
 	}
 )
 
@@ -55,7 +56,7 @@ var (
 	fullClose = func(s network.Stream) {
 		if s != nil {
 			stream, session := newStreamSessionKey(s)
-			log.Debug("AStreamCache=>fullClose", "streamkey", stream, "session", session)
+			log.Debug("AStreamCache-fn->fullClose", "streamkey", stream, "session", session)
 			go helpers.FullClose(s)
 		}
 	}
@@ -76,31 +77,11 @@ var (
 )
 
 func (a *reuse_conn) Read(p []byte) (int, error) {
-	i, err := a.reader.Read(p)
-	return i, err
-	/*if i > 0 {
-		return i, err
-	}
-	select {
-	case <-a.ctx.Done():
-		return 0, streammux.ErrReset
-	case req := <-a.rCh:
-		a.reader.Write(req.Data)
-		i, err = a.reader.Read(p)
-		fmt.Println("RRRRR--1", i, err, "::", p, "::", req.Data)
-		return i, err
-	}*/
+	return a.reader.Read(p)
 }
 
 func (a *reuse_conn) Write(p []byte) (int, error) {
 	return a.writer.Write(p)
-	/*
-		select {
-		case <-a.ctx.Done():
-			return 0, streammux.ErrReset
-		case a.wCh <- &RawData{Data: p}:
-			return len(p), nil
-		}*/
 }
 
 func newStreamKey(to, protoid string) StreamKey { return StreamKey(protoid + "@" + to) }
@@ -110,32 +91,23 @@ func (s StreamKey) Protoid() string { return strings.Split(string(s), "@")[0] }
 
 func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 	return &AStreamCache{
-		pool: make(map[StreamKey]map[SessionKey]network.Stream),
-		lock: new(sync.RWMutex),
-		reg:  make(map[string]StreamHandler),
-		//reg:  make(map[string]ReuseStreamHandler),
-		msgc: msgc,
+		pool:    make(map[StreamKey]map[SessionKey]network.Stream),
+		lock:    new(sync.RWMutex),
+		reg:     make(map[string]StreamHandler),
+		reglock: make(map[string]*sync.Mutex),
+		msgc:    msgc,
 	}
 }
 
-func (p *AStreamCache) Del(s network.Stream) {
+func (p *AStreamCache) del(s network.Stream) {
 	streamkey, sessionkey := newStreamSessionKey(s)
-	p.Del2(streamkey.Id(), streamkey.Protoid(), sessionkey)
+	p.del2(streamkey.Id(), streamkey.Protoid(), sessionkey)
 }
 
-func (p *AStreamCache) Del2(to, protoid string, session SessionKey) {
+func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	fmt.Println("AStreamCache.del2-input", to, protoid, session)
-	/*
-		for k, v := range p.pool {
-			fmt.Println("=======>", k)
-			for _k, _ := range v {
-				fmt.Println("--------------->", _k)
-			}
-		}
-	*/
-
+	log.Debug("AStreamCache-del2.input", to, protoid, session)
 	if protoid == "" {
 		// 1: protoid == nil 删除全部包含 to 的 key, 不会很多，遍历即可
 		for streamkey, sm := range p.pool {
@@ -164,7 +136,7 @@ func (p *AStreamCache) Del2(to, protoid string, session SessionKey) {
 	}
 }
 
-func (p *AStreamCache) Get(to, protoid string) (network.Stream, bool) {
+func (p *AStreamCache) get(to, protoid string) (network.Stream, bool) {
 	streamKey := newStreamKey(to, protoid)
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -179,7 +151,7 @@ func (p *AStreamCache) Get(to, protoid string) (network.Stream, bool) {
 	return nil, false
 }
 
-func (p *AStreamCache) Put(s network.Stream, opts ...interface{}) {
+func (p *AStreamCache) put(s network.Stream, opts ...interface{}) {
 	if opts == nil {
 		p.lock.Lock()
 		defer p.lock.Unlock()
@@ -199,7 +171,7 @@ func (p *AStreamCache) Put(s network.Stream, opts ...interface{}) {
 	log.Debug("AStreamCache-put", "id", streamkey.Id(), "protoid", streamkey.Protoid(), "session", sessionkey, "asc.len", len(p.pool))
 }
 
-func (p *AStreamCache) Has(pid string) bool {
+func (p *AStreamCache) has(pid string) bool {
 	if p == nil {
 		return false
 	}
@@ -207,201 +179,77 @@ func (p *AStreamCache) Has(pid string) bool {
 	return ok
 }
 
-func (p *AStreamCache) HandleStream(s network.Stream) {
+func (p *AStreamCache) handleStream(s network.Stream) {
 	pid := string(s.Protocol())
-	handlerFn, ok := p.reg[pid]
-	if !ok {
-		panic("reuse stream pid not found")
-	}
+	log.Debugf("AStreamCache-HandleStream-start : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
 	defer func() {
-		p.Del(s)
+		log.Debugf("AStreamCache-HandleStream-end : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
+		p.del(s)
 	}()
-
-	log.Debugf("AStreamCache-HandleStream : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == 1)
 	var (
 		conn        = s.Conn()
 		sid         = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
 		pk, _       = id2pubkey(s.Conn().RemotePeer())
 		ctx, cancel = context.WithCancel(context.Background())
-		//wCh         = make(chan *RawData)
-		rw = &reuse_conn{
+		rw          = &reuse_conn{
 			ctx:    ctx,
 			reader: new(bytes.Buffer),
 			writer: new(bytes.Buffer),
-			//rCh:    make(chan *RawData),
-			//wCh: make(chan *RawData),
 		}
-		wg = new(sync.WaitGroup)
 	)
 	// TODO How to return error to the handlerFn ?
-	// TODO How to return error to the handlerFn ?
-	// TODO How to return error to the handlerFn ?
-	// TODO How to return error to the handlerFn ?
-	wg.Add(1)
-	go func() {
-		defer func() {
-			log.Debug("reuse stream stop reader : ", pid+"@"+s.Conn().RemotePeer().Pretty())
-			wg.Done()
-		}()
-		//counter := 0
-		for {
-			req := new(RawData)
-			c, err := FromReader(s, req)
-			log.Debug("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
-			if err != nil {
-				log.Debug("HandleStream_reader__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
+	for {
+		req := new(RawData)
+		c, err := FromReader(s, req)
+		log.Debug("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
+		if err != nil {
+			log.Error("HandleStream_reader", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			cancel()
+		} else if _, err = rw.reader.Write(req.Data); err != nil {
+			log.Error("HandleStream_rw", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			cancel()
+		} else if err = p.reg[pid](sid, pubkeyToEcdsa(pk), rw); err != nil {
+			log.Error("HandleStream_fn", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			cancel()
+		} else if ret, err := ioutil.ReadAll(rw.writer); err != nil {
+			log.Error("HandleStream_ret", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			cancel()
+		} else if ret != nil {
+			if _, err := ToWriter(s, NewRawData(ret)); err != nil {
+				log.Error("HandleStream_writer", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", len(ret), err)
 				cancel()
-				return
-			} else if _, err = rw.reader.Write(req.Data); err != nil {
-				log.Debug("HandleStream_reader__error__close-2", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
-				cancel()
-			} else if err := handlerFn(sid, pubkeyToEcdsa(pk), rw); err != nil {
-				log.Debug("HandleStream_handlerFn__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
-				cancel()
-				return
-			} else if ret, err := ioutil.ReadAll(rw.writer); err != nil {
-				log.Debug("HandleStream_handlerFn__error__close-2", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
-				cancel()
-				return
-			} else if ret != nil {
-				//select {
-				//case <-ctx.Done():
-				//case wCh <- NewRawData(ret):
-				//}
-				//counter = counter + 1
-				//fmt.Println(counter, "<-----", len(ret), string(ret))
-				if _, err := ToWriter(s, NewRawData(ret)); err != nil {
-					log.Debug("HandleStream_writer__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), err)
-					cancel()
-					return
-				}
-				p.msgc.LogSentMessage(1)
-				p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 			}
-			select {
-			//case rw.rCh <- req:
-			//	p.msgc.LogRecvMessage(1)
-			//	p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-			case <-ctx.Done():
-				return
-			default:
-				p.msgc.LogRecvMessage(1)
-				p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-			}
+			p.msgc.LogSentMessage(1)
+			p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 		}
-	}()
-	/*
-		go func() {
-			defer func() {
-				log.Debug("reuse stream stop writer : ", pid+"@"+s.Conn().RemotePeer().Pretty())
-				wg.Done()
-			}()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case rsp := <-wCh:
-					_, err := ToWriter(s, rsp)
-					if err != nil {
-						log.Debug("HandleStream_writer__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), err)
-						cancel()
-					}
-					p.msgc.LogSentMessage(1)
-					p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-				}
-			}
-		}()
-	*/
-	wg.Wait()
-	log.Debug("Handler end", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			p.msgc.LogRecvMessage(1)
+			p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+		}
+	}
 }
 
-/*
-func (p *AStreamCache) HandleStream(s network.Stream) {
-	pid := string(s.Protocol())
-	handlerFn, ok := p.reg[pid]
-	if !ok {
-		panic("reuse stream pid not found")
-	}
-	defer func() {
-		p.Del(s)
-	}()
-
-	fmt.Println("AStreamCache-HandleStream", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
-	var (
-		conn           = s.Conn()
-		sid            = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		pk, _          = id2pubkey(s.Conn().RemotePeer())
-		recvCh, sendCh = make(chan *RawData), make(chan *RawData)
-		ctx, cancel    = context.WithCancel(context.Background())
-	)
-	go func() {
-		defer log.Debug("reuse stream stop reader : ", pid+"@"+s.Conn().RemotePeer().Pretty())
-		for {
-			req := new(RawData)
-			c, err := FromReader(s, req)
-			if err != nil {
-				log.Debug("HandleStream_reader__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), "err", err, "req", req, "t", c)
-				cancel()
-			}
-			log.Debug("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
-			select {
-			case recvCh <- req:
-				p.msgc.LogRecvMessage(1)
-				p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	fmt.Println("Reader start", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
-	go func() {
-		defer log.Debug("reuse stream stop writer : ", pid+"@"+s.Conn().RemotePeer().Pretty())
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case rsp := <-sendCh:
-				_, err := ToWriter(s, rsp)
-				if err != nil {
-					log.Debug("HandleStream_writer__error__close-1", pid+"@"+s.Conn().RemotePeer().Pretty(), err)
-					cancel()
-				}
-				p.msgc.LogSentMessage(1)
-				p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-			}
-		}
-	}()
-	fmt.Println("Writer start", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
-
-	if err := handlerFn(ctx, sid, pubkeyToEcdsa(pk),
-		func() (*RawData, error) {
-			select {
-			case <-ctx.Done():
-				return nil, io.EOF
-			case req := <-recvCh:
-				return req, nil
-			}
-		},
-		func(rsp *RawData) error {
-			select {
-			case <-ctx.Done():
-				return io.EOF
-			case sendCh <- rsp:
-			}
-			return nil
-		}); err != nil {
-		log.Debug(err)
-		cancel()
-	}
-	fmt.Println("Handler end", pid, "inbound", s.Conn().Stat().Direction == network.DirInbound)
-}
-*/
-
-func (p *AStreamCache) Reg(pid string, handler StreamHandler) {
+func (p *AStreamCache) regist(pid string, handler StreamHandler) {
 	if _, ok := p.reg[pid]; ok {
 		panic("ReuseStreamHandler Duplicate Registration")
 	}
 	p.reg[pid] = handler
+	p.reglock[pid] = new(sync.Mutex)
+}
+
+func (p *AStreamCache) lockpid(pid string) {
+	lock, ok := p.reglock[pid]
+	if ok {
+		lock.Lock()
+	}
+}
+
+func (p *AStreamCache) unlockpid(pid string) {
+	lock, ok := p.reglock[pid]
+	if ok {
+		lock.Unlock()
+	}
 }

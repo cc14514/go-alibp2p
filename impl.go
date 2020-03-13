@@ -27,7 +27,6 @@ import (
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -129,7 +128,6 @@ func NewService(cfg Config) Alibp2pService {
 		cfg:              cfg,
 		ctx:              cfg.Ctx,
 		homedir:          cfg.Homedir,
-		requestLock:      new(sync.Mutex),
 		host:             host,
 		router:           router,
 		routingDiscovery: discovery.NewRoutingDiscovery(router),
@@ -154,7 +152,7 @@ func NewService(cfg Config) Alibp2pService {
 		service.asc = NewAStreamCatch(msgc)
 		service.OnDisconnected(func(sessionId string, pubKey *ecdsa.PublicKey) {
 			id, _ := ECDSAPubEncode(pubKey)
-			service.asc.Del2(id, "", "")
+			service.asc.del2(id, "", "")
 		})
 	}
 
@@ -224,12 +222,12 @@ func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, re
 }
 
 func (self *Service) SetHandlerReuseStream(pid string, handler StreamHandler) {
-	self.asc.Reg(pid, handler)
-	self.host.SetStreamHandler(protocol.ID(pid), self.asc.HandleStream)
+	self.asc.regist(pid, handler)
+	self.host.SetStreamHandler(protocol.ID(pid), self.asc.handleStream)
 }
 
 func (self *Service) checkReuse(pid string) {
-	if self.asc.Has(pid) {
+	if self.asc.has(pid) {
 		panic("ReuseStream model just provid : SetHandlerReuseStream(string,ReuseStreamHandler)")
 	}
 }
@@ -251,13 +249,13 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
-	id, s, _, err := self.SendMsg(to, protocolID, msg)
+	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
 		self.host.Network().ClosePeer(id)
 		return err
 	}
-	if s != nil && !self.asc.Has(protocolID) {
+	if s != nil && !self.asc.has(protocolID) {
 		go helpers.FullClose(s)
 	}
 	//self.host.ConnManager().Unprotect(id, "tmp")
@@ -321,6 +319,9 @@ func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, er
 }
 
 func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error) {
+	if self.asc.has(protocolID) {
+		return "", nil, 0, fmt.Errorf("This method not support ReuseStream channel (%s), ", protocolID)
+	}
 	return self.sendMsg(to, protocolID, msg, notimeout)
 	//return self.sendMsg(to, protocolID, msg, time.Now().Add(defWriteTimeout))
 }
@@ -336,14 +337,14 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), tid)
 	}()
 
-	if self.asc.Has(protocolID) {
+	if self.asc.has(protocolID) {
 		ok := false
-		if s, ok = self.asc.Get(to, protocolID); ok {
+		if s, ok = self.asc.get(to, protocolID); ok {
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
 				log.Debug("sendMsg-reuse-stream-error-1", "err", err)
-				self.asc.Del2(to, protocolID, "")
+				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
 				//self.asc.HandleStream(s)
@@ -395,7 +396,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		defer s.SetWriteDeadline(notimeout)
 	}
 
-	if self.asc.Has(protocolID) {
+	if self.asc.has(protocolID) {
 		//fmt.Println("1111111111")
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
@@ -406,7 +407,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			total = int(_total)
 			//fmt.Println("222222222", total)
 		}
-		self.asc.Put(s)
+		self.asc.put(s)
 		//self.asc.HandleStream(s)
 	} else {
 		total, err = s.Write(msg)
@@ -492,8 +493,10 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 }
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
-	self.requestLock.Lock()
-	defer self.requestLock.Unlock()
+	if self.asc.has(proto) {
+		self.asc.lockpid(proto)
+		defer self.asc.unlockpid(proto)
+	}
 	var buf []byte
 	tot := notimeout
 	if timeout > 0 {
@@ -510,13 +513,13 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 		defer func() {
 			if s != nil {
 				s.SetReadDeadline(notimeout)
-				if !self.asc.Has(proto) {
+				if !self.asc.has(proto) {
 					helpers.FullClose(s)
 				}
 			}
 		}()
 
-		if self.asc.Has(proto) {
+		if self.asc.has(proto) {
 			rsp := new(RawData)
 			if _, err = FromReader(s, rsp); err != nil {
 				return nil, err

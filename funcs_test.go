@@ -206,13 +206,6 @@ type _rw struct {
 }
 
 func (r *_rw) Read(p []byte) (n int, err error) {
-	i, err := r.reader.Read(p)
-	fmt.Println(i, err)
-	if i > 0 {
-		return i, err
-	}
-	d := "1234567890"
-	r.reader.Write([]byte(d))
 	return r.reader.Read(p)
 }
 

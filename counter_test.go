@@ -70,5 +70,5 @@ func TestAddCounter(t *testing.T) {
 
 func TestPool(t *testing.T) {
 	var asc AStreamCache
-	t.Log(asc.Has("hello"))
+	t.Log(asc.has("hello"))
 }

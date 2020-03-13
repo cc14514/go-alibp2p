@@ -49,7 +49,6 @@ type (
 		isDirectFn       func(id string) bool
 		bwc, rwc, msgc   metrics.Reporter
 		asc              *AStreamCache
-		requestLock      *sync.Mutex
 	}
 	blankValidator struct{}
 	ConnType       int
