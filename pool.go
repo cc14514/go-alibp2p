@@ -199,8 +199,17 @@ func (p *AStreamCache) handleStream(s network.Stream) {
 	)
 	// TODO How to return error to the handlerFn ?
 	for {
-		req := new(RawData)
-		c, err := FromReader(s, req)
+		var (
+			ret []byte
+			req = new(RawData)
+			err error
+			c   int64
+		)
+		c, err = FromReader(s, req)
+		if req.Err != "" {
+			log.Error("HandleStream_error_from_reader", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", req.Err)
+			return
+		}
 		log.Debug("Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
 		if err != nil {
 			log.Error("HandleStream_reader", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
@@ -211,7 +220,7 @@ func (p *AStreamCache) handleStream(s network.Stream) {
 		} else if err = p.reg[pid](sid, pubkeyToEcdsa(pk), rw); err != nil {
 			log.Error("HandleStream_fn", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
 			cancel()
-		} else if ret, err := ioutil.ReadAll(rw.writer); err != nil {
+		} else if ret, err = ioutil.ReadAll(rw.writer); err != nil {
 			log.Error("HandleStream_ret", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
 			cancel()
 		} else if ret != nil {
@@ -224,6 +233,9 @@ func (p *AStreamCache) handleStream(s network.Stream) {
 		}
 		select {
 		case <-ctx.Done():
+			if err != nil {
+				ToWriter(s, &RawData{Err: err.Error()})
+			}
 			return
 		default:
 			p.msgc.LogRecvMessage(1)

@@ -516,7 +516,12 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 		if self.asc.has(proto) {
 			rsp := new(RawData)
 			if _, err = FromReader(s, rsp); err != nil {
+				self.asc.del2(to, proto, "")
 				return nil, err
+			}
+			if rsp.Err != "" {
+				self.asc.del2(to, proto, "")
+				return nil, errors.New(rsp.Err)
 			}
 			buf = rsp.Data
 		} else {

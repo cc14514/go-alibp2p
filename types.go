@@ -20,6 +20,7 @@ import (
 
 type (
 	RawData struct {
+		Err  string
 		Data []byte
 	}
 

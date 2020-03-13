@@ -39,6 +39,9 @@ var (
 	//defReadTimeout          = 25 * time.Second
 	//defWriteTimeout         = 15 * time.Second
 	notimeout = time.Time{}
+	//def_maxsize  int64 = 512
+	def_maxsize int64 = 13 * 1024 * 1024
+	//_maxsize  int64 = 13 * 1024 * 1024
 )
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
