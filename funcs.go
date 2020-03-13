@@ -277,7 +277,7 @@ var (
 		return amino.UnmarshalBinaryLengthPrefixed(data, ptr)
 	}
 	FromReader = func(rw io.ReadWriter, ptr interface{}, maxSize ...int64) (int64, error) {
-		var _maxsize int64 = 5 * 1024 * 1024
+		var _maxsize int64 = 13 * 1024 * 1024
 		if maxSize != nil && len(maxSize) > 0 {
 			_maxsize = maxSize[0]
 		}

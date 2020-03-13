@@ -323,7 +323,6 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 		return "", nil, 0, fmt.Errorf("This method not support ReuseStream channel (%s), ", protocolID)
 	}
 	return self.sendMsg(to, protocolID, msg, notimeout)
-	//return self.sendMsg(to, protocolID, msg, time.Now().Add(defWriteTimeout))
 }
 
 func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (
@@ -347,7 +346,6 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
-				//self.asc.HandleStream(s)
 			}
 			return
 		}
@@ -397,7 +395,6 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	}
 
 	if self.asc.has(protocolID) {
-		//fmt.Println("1111111111")
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
@@ -405,13 +402,10 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			return
 		} else {
 			total = int(_total)
-			//fmt.Println("222222222", total)
 		}
 		self.asc.put(s)
-		//self.asc.HandleStream(s)
 	} else {
 		total, err = s.Write(msg)
-		//fmt.Println("3333333333333", total, err)
 		if err != nil {
 			log.Debug("sendMsg-reuse-stream-error-3", "err", err)
 		}
