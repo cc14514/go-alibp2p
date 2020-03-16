@@ -342,7 +342,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
-				log.Debug("sendMsg-reuse-stream-error-1", "err", err)
+				log.Error("sendMsg-reuse-stream-error-1", "err", err)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -398,7 +398,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
-			log.Debug("sendMsg-reuse-stream-error-2", "err", err)
+			log.Error("sendMsg-reuse-stream-error-2", "err", err)
 			return
 		} else {
 			total = int(_total)

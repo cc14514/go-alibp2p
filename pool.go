@@ -181,9 +181,9 @@ func (p *AStreamCache) has(pid string) bool {
 
 func (p *AStreamCache) handleStream(s network.Stream) {
 	pid := string(s.Protocol())
-	log.Debugf("AStreamCache-HandleStream-start : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
+	log.Infof("AStreamCache-HandleStream-start : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
 	defer func() {
-		log.Debugf("AStreamCache-HandleStream-end : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
+		log.Infof("AStreamCache-HandleStream-end : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
 		p.del(s)
 	}()
 	var (
