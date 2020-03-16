@@ -26,6 +26,7 @@ import (
 	gologging "github.com/whyrusleeping/go-logging"
 	"golang.org/x/xerrors"
 	"io/ioutil"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -84,8 +85,6 @@ func NewService(cfg Config) Alibp2pService {
 		libp2p.NATPortMap(),
 		libp2p.ListenAddrs(list...),
 		libp2p.Identity(priv),
-		libp2p.EnableAutoRelay(),
-		libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
 		libp2p.ConnectionManager(connmgr.NewConnManager(int(connLow), int(connHi), time.Second*30)),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			if router == nil {
@@ -100,6 +99,13 @@ func NewService(cfg Config) Alibp2pService {
 			}
 			return router, nil
 		}),
+	}
+	if cfg.Relay {
+		os.Setenv("alibp2prelay", "enable") // 在这里使用 go-libp2p/p2p/protocol/identify/id.go:225
+		optlist = append(optlist,
+			libp2p.EnableAutoRelay(),
+			libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
+		)
 	}
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
@@ -371,8 +377,11 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		}
 		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
 		targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
-		relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
-		raddr := []ma.Multiaddr{relayAddr, targetAddr}
+		raddr := []ma.Multiaddr{targetAddr}
+		if self.cfg.Relay {
+			relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
+			raddr = append(raddr, relayAddr)
+		}
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.PermanentAddrTTL)
 	} else {
 		pi, err := self.router.FindPeer(self.ctx, peerid)

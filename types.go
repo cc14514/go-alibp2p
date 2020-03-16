@@ -31,7 +31,7 @@ type (
 		Homedir                                string
 		Port, ConnLow, ConnHi, BootstrapPeriod uint64
 		Bootnodes                              []string
-		Discover, ReuseStream                  bool
+		Discover, ReuseStream, Relay           bool
 		Networkid, MuxPort                     *big.Int
 
 		PrivKey  *ecdsa.PrivateKey
