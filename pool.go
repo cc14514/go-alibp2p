@@ -180,6 +180,10 @@ func (p *AStreamCache) has(pid string) bool {
 }
 
 func (p *AStreamCache) handleStream(s network.Stream) {
+	go p.doHandleStream(s)
+}
+
+func (p *AStreamCache) doHandleStream(s network.Stream) {
 	pid := string(s.Protocol())
 	log.Infof("AStreamCache-HandleStream-start : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
 	defer func() {
@@ -242,6 +246,7 @@ func (p *AStreamCache) handleStream(s network.Stream) {
 			p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 		}
 	}
+
 }
 
 func (p *AStreamCache) regist(pid string, handler StreamHandler) {

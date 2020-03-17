@@ -258,6 +258,7 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
+		log.Error("alibp2p::SendMsgAfterClose", "id", to, "protocolID", protocolID, "err", err.Error())
 		self.host.Network().ClosePeer(id)
 		return err
 	}
@@ -348,7 +349,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
-				log.Error("sendMsg-reuse-stream-error-1", "err", err)
+				log.Error("alibp2p-service::sendMsg-reuse-stream-error-1", "err", err)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -386,7 +387,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	} else {
 		pi, err := self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
-			log.Debug(err)
+			log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
 			return peerid, nil, 0, err
 		}
 		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
@@ -407,7 +408,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
-			log.Error("sendMsg-reuse-stream-error-2", "err", err)
+			log.Error("alibp2p-service::sendMsg-reuse-stream-error-2", "err", err)
 			return
 		} else {
 			total = int(_total)
@@ -416,7 +417,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	} else {
 		total, err = s.Write(msg)
 		if err != nil {
-			log.Debug("sendMsg-reuse-stream-error-3", "err", err)
+			log.Debug("alibp2p-service::sendMsg-reuse-stream-error-3", "err", err)
 		}
 	}
 
