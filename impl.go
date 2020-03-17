@@ -349,7 +349,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
-				log.Error("alibp2p-service::sendMsg-reuse-stream-error-1", "err", err)
+				log.Error("alibp2p-service::sendMsg-reuse-stream-error-1", "err", err.Error(), "id", to, "pid", protocolID)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -362,18 +362,18 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	if err != nil {
 		ipfsaddr, err := ma.NewMultiaddr(to)
 		if err != nil {
-			log.Debug(err)
+			log.Error("alibp2p-service::sendMsg-IDB58Decode-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
 
 		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
 		if err != nil {
-			log.Debug(err)
+			log.Error("alibp2p-service::sendMsg-ValueForProtocol-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
 		peerid, err = peer.IDB58Decode(pid)
 		if err != nil {
-			log.Debug(err)
+			log.Error("alibp2p-service::sendMsg-IDB58Decode-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
 		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
@@ -395,11 +395,13 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	s, err = self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
 	if err != nil {
-		log.Debug(err)
+		dl, ok := self.ctx.Deadline()
+		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID, "deadline", dl, "isDeadline", ok)
 		return peerid, nil, 0, err
 	}
 
 	if notimeout != timeout {
+		log.Debug("alibp2p-service::sendMsg-setDeadline", "timeout", timeout)
 		s.SetWriteDeadline(timeout)
 		defer s.SetWriteDeadline(notimeout)
 	}
@@ -408,7 +410,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		var _total int64
 		_total, err = ToWriter(s, &RawData{Data: msg})
 		if err != nil {
-			log.Error("alibp2p-service::sendMsg-reuse-stream-error-2", "err", err)
+			log.Error("alibp2p-service::sendMsg-reuse-stream-error-2", "err", err, "id", to, "pid", protocolID)
 			return
 		} else {
 			total = int(_total)
@@ -417,7 +419,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	} else {
 		total, err = s.Write(msg)
 		if err != nil {
-			log.Debug("alibp2p-service::sendMsg-reuse-stream-error-3", "err", err)
+			log.Error("alibp2p-service::sendMsg-reuse-stream-error-3", "err", err, "id", to, "pid", protocolID)
 		}
 	}
 
