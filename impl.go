@@ -395,8 +395,8 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	s, err = self.host.NewStream(self.ctx, peerid, protocol.ID(protocolID))
 	if err != nil {
-		dl, ok := self.ctx.Deadline()
-		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID, "deadline", dl, "isDeadline", ok)
+		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID)
+		//panic(err)
 		return peerid, nil, 0, err
 	}
 
@@ -486,7 +486,9 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 			// 连出去的，并且 preMsg 有值，就给对方发消息
 			if !in && preMsg != nil {
 				proto, pkg := preMsg()
-				resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 3*time.Second)
+				log.Debug("alibp2p-service::OnConnected-send-premsg-start", "id", conn.RemotePeer().Pretty(), "proto", proto, "pkg", pkg)
+				resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 20*time.Second)
+				log.Debug("alibp2p-service::OnConnected-send-premsg-end", "id", conn.RemotePeer().Pretty(), "proto", proto, "resp", resp, "err", err)
 				if err == nil {
 					preRtn = resp
 				} else {
@@ -514,7 +516,7 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 		if tot != notimeout {
 			s.SetReadDeadline(time.Now().Add(timeout))
 		} else {
-			s.SetReadDeadline(time.Now().Add(10 * time.Second))
+			s.SetReadDeadline(time.Now().Add(20 * time.Second))
 		}
 		defer func() {
 			if s != nil {
