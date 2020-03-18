@@ -407,7 +407,12 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
 	if err != nil {
-		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID)
+		addrs := self.host.Peerstore().Addrs(peerid)
+		_addrs := make([]string, 0)
+		for _, addr := range addrs {
+			_addrs = append(_addrs, addr.String())
+		}
+		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID, "addrs", _addrs)
 		//panic(err)
 		return peerid, nil, 0, err
 	}
