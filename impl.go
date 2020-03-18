@@ -360,13 +360,17 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	peerid, err = peer.IDB58Decode(to)
 	if err != nil {
-		ipfsaddr, err := ma.NewMultiaddr(to)
+		var (
+			ipfsaddr ma.Multiaddr
+			pid      string
+		)
+		ipfsaddr, err = ma.NewMultiaddr(to)
 		if err != nil {
 			log.Error("alibp2p-service::sendMsg-IDB58Decode-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
 
-		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+		pid, err = ipfsaddr.ValueForProtocol(ma.P_IPFS)
 		if err != nil {
 			log.Error("alibp2p-service::sendMsg-ValueForProtocol-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
@@ -391,7 +395,8 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		}
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
 	} else {
-		pi, err := self.router.FindPeer(self.ctx, peerid)
+		var pi peer.AddrInfo
+		pi, err = self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
 			log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
 			return peerid, nil, 0, err
