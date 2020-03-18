@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tendermint/go-amino"
 	"io"
@@ -166,15 +165,16 @@ var (
 			wg.Add(1)
 			go func(p peer.AddrInfo) {
 				defer wg.Done()
-				log.Debugf("from %s connecting to %s : %v", ph.ID().Pretty(), p.ID, p.Addrs)
-				ph.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
+				log.Debugf("alibp2p-service::connectFn: from %s connecting to %s : %v", ph.ID().Pretty(), p.ID, p.Addrs)
+				// 这里不用重复 addAddrs ， Connect 已经 add 过了
+				//ph.Peerstore().AddAddrs(p.ID, p.Addrs, _ttl)
 				if err := ph.Connect(ctx, p); err != nil {
 					//log.Debug("connect failed", p.ID)
 					//log.Printf("failed to connect with %v: %s", p.ID, err)
 					errs <- err
 					return
 				}
-				log.Debug("connect success :", p.ID.Pretty())
+				log.Debug("alibp2p-service::connectFn: connect success :", p.ID.Pretty())
 			}(p)
 		}
 		wg.Wait()

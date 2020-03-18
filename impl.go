@@ -383,14 +383,26 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			relayAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p-circuit/ipfs/%s", peer.IDB58Encode(peerid)))
 			raddr = append(raddr, relayAddr)
 		}
-		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.PermanentAddrTTL)
+		// TODO
+		if raddr == nil || len(raddr) == 0 {
+			err = errors.New("no good addrs")
+			log.Error("alibp2p-service::sendMsg-addrs-error-1", "err", err.Error(), "id", to, "pid", protocolID)
+			return
+		}
+		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
 	} else {
 		pi, err := self.router.FindPeer(self.ctx, peerid)
 		if err != nil {
 			log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
 			return peerid, nil, 0, err
 		}
-		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
+		// TODO
+		if pi.Addrs == nil || len(pi.Addrs) == 0 {
+			err = errors.New("no good addrs")
+			log.Error("alibp2p-service::sendMsg-addrs-error-2", "err", err.Error(), "id", to, "pid", protocolID)
+			return
+		}
+		self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
 	}
 
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
@@ -565,6 +577,9 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
+	fmt.Println(">>>> alibp2p-service >>>>")
+	fmt.Println("logvsn", logvsn)
+	fmt.Println("<<<< alibp2p-service <<<<")
 	startCounter(self)
 	for _, notify := range self.notifiee {
 		self.host.Network().Notify(notify)
@@ -700,6 +715,9 @@ func (self *Service) BootstrapOnce() error {
 	err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
 	if err != nil {
 		log.Debug("bootstrap-once-query-error", "err", err)
+	}
+	for _, p := range self.bootnodes {
+		self.host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 	}
 	return err
 }
