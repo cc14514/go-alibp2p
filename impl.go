@@ -47,7 +47,7 @@ func NewService(cfg Config) Alibp2pService {
 	default:
 		golog.SetAllLoggers(gologging.ERROR)
 	}
-	log.Debug("alibp2p.NewService", cfg)
+	log.Debug("alibp2p-service::alibp2p.NewService", cfg)
 
 	var (
 		err             error
@@ -397,23 +397,6 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			return
 		}
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
-	} else {
-		/*
-				var pi peer.AddrInfo
-				pi, err = self.router.FindPeer(self.ctx, peerid)
-				if err != nil {
-					log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
-					return peerid, nil, 0, err
-				}
-				if pi.Addrs == nil || len(pi.Addrs) == 0 {
-					log.Warning("alibp2p-service::sendMsg-addrs-error-2", "err", "no good addrs", "id", to, "pid", protocolID)
-				}
-			//self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
-			addrs := self.host.Peerstore().Addrs(peerid)
-			if addrs == nil || len(addrs) == 0 {
-				log.Warning("alibp2p-service::sendMsg-addrs-error-2", "err", "no good addrs", "id", to, "pid", protocolID)
-			}
-		*/
 	}
 
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
@@ -457,27 +440,27 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	id, err := peer.IDFromPublicKey(ecdsaToPubkey(pubkey))
 	if err != nil {
-		log.Debug("PreConnect-error-1", "id", id.Pretty(), "err", err)
+		log.Error("alibp2p-service::PreConnect-error-1", "id", id.Pretty(), "err", err)
 		return err
 	}
 	pi, err := self.findpeer(id.Pretty())
 	if err != nil {
-		log.Debug("PreConnect-error-2", "id", id.Pretty(), "err", err)
+		log.Error("alibp2p-service::PreConnect-error-2", "id", id.Pretty(), "err", err)
 		return err
 	}
 	ctx := context.WithValue(self.ctx, "nodelay", "true")
 	err = connectFn(ctx, self.host, []peer.AddrInfo{pi})
 	if err != nil {
-		log.Debug("PreConnect-error-3", "id", id.Pretty(), "err", err)
+		log.Error("alibp2p-service::PreConnect-error-3", "id", id.Pretty(), "err", err)
 		return err
 	}
-	log.Debug("PreConnect-success : protected", "id", id.Pretty())
+	log.Debug("alibp2p-service::PreConnect-success : protected", "id", id.Pretty())
 	self.host.ConnManager().Protect(id, "pre")
 	go func(ctx context.Context, id peer.ID) {
 		select {
 		case <-time.After(peerstore.TempAddrTTL / 4):
 			ok := self.host.ConnManager().Unprotect(id, "pre")
-			log.Debug("PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
+			log.Debug("alibp2p-service::PreConnect-expire : unprotect", "id", id.Pretty(), "ok", ok)
 		case <-ctx.Done():
 		}
 	}(ctx, id)
@@ -726,11 +709,11 @@ func (self *Service) Get(k string) ([]byte, error) {
 func (self *Service) BootstrapOnce() error {
 	err := connectFn(self.ctx, self.host, self.bootnodes)
 	if err != nil {
-		log.Debug("bootstrap-once-conn-error", "err", err)
+		log.Debug("alibp2p-service::bootstrap-once-conn-error", "err", err)
 	}
 	err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
 	if err != nil {
-		log.Debug("bootstrap-once-query-error", "err", err)
+		log.Debug("alibp2p-service::bootstrap-once-query-error", "err", err)
 	}
 	for _, p := range self.bootnodes {
 		self.host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
@@ -743,11 +726,11 @@ func (self *Service) bootstrap() error {
 	if self.cfg.BootstrapPeriod > period {
 		period = self.cfg.BootstrapPeriod
 	}
-	log.Debug("host-addrs", self.host.Addrs())
-	log.Debug("host-network-listen", self.host.Network().ListenAddresses())
-	log.Debug("host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
+	log.Debug("alibp2p-service::host-addrs", self.host.Addrs())
+	log.Debug("alibp2p-service::host-network-listen", self.host.Network().ListenAddresses())
+	log.Debug("alibp2p-service::host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
 	go func() {
-		log.Debug("loopboot-start", "period", period)
+		log.Debug("alibp2p-service::loopboot-start", "period", period)
 		if atomic.CompareAndSwapInt32(&loopboot, 0, 1) {
 			defer func() {
 				atomic.StoreInt32(&loopboot, 0)
@@ -766,18 +749,18 @@ func (self *Service) bootstrap() error {
 							others = self.peersWithoutBootnodes()
 							total  = len(others)
 						)
-						log.Debug("bootstrap looping")
+						log.Debug("alibp2p-service::bootstrap looping")
 						err := connectFn(self.ctx, self.host, self.bootnodes)
 						if err == nil {
-							log.Debug("bootstrap success")
+							log.Debug("alibp2p-service::bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
-								log.Debug("Bootstrap the host")
+								log.Debug("alibp2p-service::Bootstrap the host")
 								err = self.router.Bootstrap(self.ctx)
 								if err != nil {
-									log.Debug("bootstrap-error", "err", err)
+									log.Debug("alibp2p-service::bootstrap-error", "err", err)
 								}
 							} else {
-								log.Debug("Reconnected and bootstrap the host once")
+								log.Debug("alibp2p-service::Reconnected and bootstrap the host once")
 								self.BootstrapOnce()
 							}
 						} else if total > 0 {
@@ -786,14 +769,14 @@ func (self *Service) bootstrap() error {
 							}
 							tasks := randPeers(others, limit)
 							err := connectFn(self.ctx, self.host, tasks)
-							log.Debug("bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
+							log.Debug("alibp2p-service::bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
 						}
 					}
 				}
 				timer.Reset(time.Duration(period) * time.Second)
 			}
 		}
-		log.Debug("loopboot-end")
+		log.Debug("alibp2p-service::loopboot-end")
 	}()
 	return nil
 }
