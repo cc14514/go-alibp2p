@@ -116,9 +116,36 @@ func (p *AStreamCache) del(s network.Stream) {
 func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.del2WithoutLock(to, protoid, session)
+	log.Debug("AStreamCache-del2.input", to, protoid, session, p.pool)
+	if protoid == "" {
+		// 1: protoid == nil 删除全部包含 to 的 key, 不会很多，遍历即可
+		for streamkey, sm := range p.pool {
+			if streamkey.Id() == to {
+				cleanSession(sm)
+				delete(p.pool, streamkey)
+				log.Debug("AStreamCache-del2-1", "id", to, "key", streamkey, "asc.len", len(p.pool))
+			}
+		}
+	} else if session == "" {
+		// 2: session == nil 删除 streamkey 下所有 session
+		k := newStreamKey(to, protoid)
+		cleanSession(p.pool[k])
+		delete(p.pool, k)
+		log.Debug("AStreamCache-del2-2", "id", to, "protoid", protoid, "key", k, "asc.len", len(p.pool))
+	} else if sm, ok := p.pool[newStreamKey(to, protoid)]; ok {
+		fullClose(sm[session].stream)
+		delete(sm, session)
+		log.Debug("AStreamCache-del2-3", "id", to, "protoid", protoid, "session", session, "asc.len", len(p.pool))
+		k := newStreamKey(to, protoid)
+		if len(sm) == 0 {
+			delete(p.pool, k)
+		} else {
+			p.pool[k] = sm
+		}
+	}
 }
 
+/*
 func (p *AStreamCache) del2WithoutLock(to, protoid string, session SessionKey) {
 	log.Debug("AStreamCache-del2.input", to, protoid, session)
 	if protoid == "" {
@@ -148,25 +175,25 @@ func (p *AStreamCache) del2WithoutLock(to, protoid string, session SessionKey) {
 		}
 	}
 }
+*/
 
-func (p *AStreamCache) get(to, protoid string) (network.Stream, bool) {
+func (p *AStreamCache) get(to, protoid string) (network.Stream, bool, bool) {
 	streamKey := newStreamKey(to, protoid)
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	sm, ok := p.pool[streamKey]
 	if !ok {
-		return nil, false
+		return nil, false, false
 	}
 	for k, v := range sm {
 		if v.expire < time.Now().Unix() {
-			p.del2WithoutLock(to, protoid, k)
-			log.Info("alibp2p-service::AStreamCache-get-expire", to, protoid, k)
-			continue
+			log.Info("alibp2p-service::AStreamCache-get-expire", v.expire, to, protoid, k)
+			return v.stream, false, true
 		}
 		log.Debug("AStreamCache-get", "id", to, "protoid", protoid, "asc.len", len(p.pool))
-		return v.stream, true
+		return v.stream, true, false
 	}
-	return nil, false
+	return nil, false, false
 }
 
 func (p *AStreamCache) put(s network.Stream, opts ...interface{}) {

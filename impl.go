@@ -344,8 +344,8 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	}()
 
 	if self.asc.has(protocolID) {
-		ok := false
-		if s, ok = self.asc.get(to, protocolID); ok {
+		ok, expire := false, false
+		if s, ok, expire = self.asc.get(to, protocolID); ok {
 			var _total int64
 			_total, err = ToWriter(s, &RawData{Data: msg})
 			if err != nil {
@@ -355,6 +355,9 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 				total = int(_total)
 			}
 			return
+		} else if expire {
+			log.Info("alibp2p-service::sendMsg-gc-expire-stream", "id", to, "pid", protocolID)
+			self.asc.del(s)
 		}
 	}
 
