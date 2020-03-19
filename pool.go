@@ -30,7 +30,10 @@ import (
 	"io/ioutil"
 	"strings"
 	"sync"
+	"time"
 )
+
+const def_expire = 60 // 10sec for debug
 
 type (
 	reuse_conn struct {
@@ -40,15 +43,20 @@ type (
 		//rCh    chan *RawData
 		//wCh chan *RawData
 	}
+	reuse_stream struct {
+		expire int64
+		stream network.Stream
+	}
 	StreamKey    string
 	SessionKey   string
 	AStreamCache struct {
 		// { aconnkey -> { session -> conn } }
-		pool    map[StreamKey]map[SessionKey]network.Stream
+		pool    map[StreamKey]map[SessionKey]*reuse_stream
 		reg     map[string]StreamHandler
 		reglock map[string]*sync.Mutex
 		lock    *sync.RWMutex
 		msgc    metrics.Reporter
+		expire  int64
 	}
 )
 
@@ -60,9 +68,9 @@ var (
 			go helpers.FullClose(s)
 		}
 	}
-	cleanSession = func(sm map[SessionKey]network.Stream) {
+	cleanSession = func(sm map[SessionKey]*reuse_stream) {
 		for _, s := range sm {
-			fullClose(s)
+			fullClose(s.stream)
 		}
 	}
 	newStreamSessionKey = func(s network.Stream) (stream StreamKey, session SessionKey) {
@@ -91,11 +99,12 @@ func (s StreamKey) Protoid() string { return strings.Split(string(s), "@")[0] }
 
 func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 	return &AStreamCache{
-		pool:    make(map[StreamKey]map[SessionKey]network.Stream),
+		pool:    make(map[StreamKey]map[SessionKey]*reuse_stream),
 		lock:    new(sync.RWMutex),
 		reg:     make(map[string]StreamHandler),
 		reglock: make(map[string]*sync.Mutex),
 		msgc:    msgc,
+		expire:  def_expire,
 	}
 }
 
@@ -107,6 +116,10 @@ func (p *AStreamCache) del(s network.Stream) {
 func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	p.del2WithoutLock(to, protoid, session)
+}
+
+func (p *AStreamCache) del2WithoutLock(to, protoid string, session SessionKey) {
 	log.Debug("AStreamCache-del2.input", to, protoid, session)
 	if protoid == "" {
 		// 1: protoid == nil 删除全部包含 to 的 key, 不会很多，遍历即可
@@ -124,7 +137,7 @@ func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 		delete(p.pool, k)
 		log.Debug("AStreamCache-del2-2", "id", to, "protoid", protoid, "key", k, "asc.len", len(p.pool))
 	} else if sm, ok := p.pool[newStreamKey(to, protoid)]; ok {
-		fullClose(sm[session])
+		fullClose(sm[session].stream)
 		delete(sm, session)
 		log.Debug("AStreamCache-del2-3", "id", to, "protoid", protoid, "session", session, "asc.len", len(p.pool))
 		k := newStreamKey(to, protoid)
@@ -144,9 +157,14 @@ func (p *AStreamCache) get(to, protoid string) (network.Stream, bool) {
 	if !ok {
 		return nil, false
 	}
-	for _, v := range sm {
+	for k, v := range sm {
+		if v.expire < time.Now().Unix() {
+			p.del2WithoutLock(to, protoid, k)
+			log.Info("alibp2p-service::AStreamCache-get-expire", to, protoid, k)
+			continue
+		}
 		log.Debug("AStreamCache-get", "id", to, "protoid", protoid, "asc.len", len(p.pool))
-		return v, true
+		return v.stream, true
 	}
 	return nil, false
 }
@@ -159,14 +177,17 @@ func (p *AStreamCache) put(s network.Stream, opts ...interface{}) {
 	streamkey, sessionkey := newStreamSessionKey(s)
 	sm, ok := p.pool[streamkey]
 	if !ok {
-		sm = make(map[SessionKey]network.Stream)
+		sm = make(map[SessionKey]*reuse_stream)
 	}
 	_, ok = sm[sessionkey]
 	if ok {
 		//fullClose(old)
 		return
 	}
-	sm[sessionkey] = s
+	sm[sessionkey] = &reuse_stream{
+		expire: time.Now().Add(time.Duration(p.expire) * time.Second).Unix(),
+		stream: s,
+	}
 	p.pool[streamkey] = sm
 	log.Debug("AStreamCache-put", "id", streamkey.Id(), "protoid", streamkey.Protoid(), "session", sessionkey, "asc.len", len(p.pool))
 }

@@ -39,7 +39,7 @@ func NewService(cfg Config) Alibp2pService {
 	case 5:
 		golog.SetAllLoggers(gologging.DEBUG)
 	case 3, 4:
-		golog.SetAllLoggers(gologging.NOTICE)
+		golog.SetAllLoggers(gologging.INFO)
 	case 1, 2:
 		golog.SetAllLoggers(gologging.WARNING)
 	case 0:
@@ -396,21 +396,21 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
 	} else {
 		/*
-			var pi peer.AddrInfo
-			pi, err = self.router.FindPeer(self.ctx, peerid)
-			if err != nil {
-				log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
-				return peerid, nil, 0, err
-			}
-			if pi.Addrs == nil || len(pi.Addrs) == 0 {
+				var pi peer.AddrInfo
+				pi, err = self.router.FindPeer(self.ctx, peerid)
+				if err != nil {
+					log.Error("alibp2p-service::sendMsg findpeer-error", "id", to, "protocolID", protocolID, "err", err.Error())
+					return peerid, nil, 0, err
+				}
+				if pi.Addrs == nil || len(pi.Addrs) == 0 {
+					log.Warning("alibp2p-service::sendMsg-addrs-error-2", "err", "no good addrs", "id", to, "pid", protocolID)
+				}
+			//self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
+			addrs := self.host.Peerstore().Addrs(peerid)
+			if addrs == nil || len(addrs) == 0 {
 				log.Warning("alibp2p-service::sendMsg-addrs-error-2", "err", "no good addrs", "id", to, "pid", protocolID)
 			}
 		*/
-		//self.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
-		addrs := self.host.Peerstore().Addrs(peerid)
-		if addrs == nil || len(addrs) == 0 {
-			log.Warning("alibp2p-service::sendMsg-addrs-error-2", "err", "no good addrs", "id", to, "pid", protocolID)
-		}
 	}
 
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
