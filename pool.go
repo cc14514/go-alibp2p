@@ -60,6 +60,13 @@ type (
 	}
 )
 
+func (a *reuse_stream) Stream() network.Stream {
+	if a != nil {
+		return a.stream
+	}
+	return nil
+}
+
 var (
 	fullClose = func(s network.Stream) {
 		if s != nil {
@@ -70,7 +77,7 @@ var (
 	}
 	cleanSession = func(sm map[SessionKey]*reuse_stream) {
 		for _, s := range sm {
-			fullClose(s.stream)
+			fullClose(s.Stream())
 		}
 	}
 	newStreamSessionKey = func(s network.Stream) (stream StreamKey, session SessionKey) {
@@ -133,7 +140,7 @@ func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 		delete(p.pool, k)
 		log.Debug("alibp2p-service::AStreamCache-del2-2", "id", to, "protoid", protoid, "key", k, "asc.len", len(p.pool))
 	} else if sm, ok := p.pool[newStreamKey(to, protoid)]; ok {
-		fullClose(sm[session].stream)
+		fullClose(sm[session].Stream())
 		delete(sm, session)
 		log.Debug("alibp2p-service::AStreamCache-del2-3", "id", to, "protoid", protoid, "session", session, "asc.len", len(p.pool))
 		k := newStreamKey(to, protoid)
