@@ -264,6 +264,17 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	}
 	if s != nil && !self.asc.has(protocolID) {
 		go helpers.FullClose(s)
+	} else {
+		// reuse channel
+		rsp := new(RawData)
+		_, err := FromReader(s, rsp)
+		if err != nil {
+			return err
+		}
+		if rsp.Err != "" {
+			return errors.New(rsp.Err)
+		}
+		log.Debugf("alibp2p::SendMsgAfterClose-ack %s@%s msgid=%d", protocolID, to, rsp.ID())
 	}
 	//self.host.ConnManager().Unprotect(id, "tmp")
 	return nil
@@ -347,12 +358,14 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		ok, expire := false, false
 		if s, ok, expire = self.asc.get(to, protocolID); ok {
 			var _total int64
-			_total, err = ToWriter(s, &RawData{Data: msg})
+			req := NewRawData(nil, msg)
+			_total, err = ToWriter(s, req)
 			if err != nil {
-				log.Error("alibp2p-service::sendMsg-reuse-stream-error-1", "err", err.Error(), "id", to, "pid", protocolID)
+				log.Debugf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
+				log.Debugf("alibp2p-service::sendMsg-reuse-stream-1 to=%s@%s msgid=%d msgsize=%d", protocolID, to, req.ID(), req.Len())
 			}
 			return
 		} else if expire {
@@ -419,12 +432,14 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 
 	if self.asc.has(protocolID) {
 		var _total int64
-		_total, err = ToWriter(s, &RawData{Data: msg})
+		req := NewRawData(nil, msg)
+		_total, err = ToWriter(s, req)
 		if err != nil {
-			log.Error("alibp2p-service::sendMsg-reuse-stream-error-2", "err", err, "id", to, "pid", protocolID)
+			log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-2 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
 			return
 		} else {
 			total = int(_total)
+			log.Debugf("alibp2p-service::sendMsg-reuse-stream-2 to=%s@%s msgid=%d msgsize=%d", protocolID, to, req.ID(), req.Len())
 		}
 		self.asc.put(s)
 	} else {
@@ -546,8 +561,10 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 			}
 			if rsp.Err != "" {
 				self.asc.del2(to, proto, "")
+				log.Errorf("alibp2p::RequestWithTimeout-error %s@%s msgid=%d err=%s", proto, to, rsp.ID(), rsp.Err)
 				return nil, errors.New(rsp.Err)
 			}
+			log.Debugf("alibp2p::RequestWithTimeout-ack %s@%s msgid=%d", proto, to, rsp.ID())
 			buf = rsp.Data
 		} else {
 			if buf, err = ioutil.ReadAll(s); err != nil {

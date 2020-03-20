@@ -3,6 +3,7 @@ module github.com/cc14514/go-alibp2p
 require (
 	github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
 	github.com/cc14514/go-mux-transport v0.0.0-20191107033455-2e89816349e6
+	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/ipfs/go-log v0.0.1
 	github.com/libp2p/go-buffer-pool v0.0.2

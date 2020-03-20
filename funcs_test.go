@@ -23,11 +23,14 @@ package alibp2p
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"io"
+	"math/big"
 	"net"
 	"reflect"
 	"sync/atomic"
@@ -222,4 +225,52 @@ func Test_rw(t *testing.T) {
 	t.Log(i, err, buf)
 	i, err = rw.Read(buf)
 	t.Log(i, err, buf)
+
+	mm := make(map[string]int64)
+	x := mm["foo"]
+	t.Log(mm, x)
+	mm["foo"] = x + 1
+	t.Log(mm)
+}
+
+func TestUUID(t *testing.T) {
+	m := make(map[string]struct{})
+	n := time.Now()
+	for i := 0; i < 500000; i++ {
+		u := uuid.New()
+		//k := hex.EncodeToString(u[:])
+		m[u.String()] = struct{}{}
+	}
+	t.Log(time.Since(n), len(m))
+}
+
+func TestUUID2(t *testing.T) {
+	m := make(map[*big.Int]struct{})
+	n := time.Now()
+	for i := 0; i < 500000; i++ {
+		u := uuid.New()
+		k := new(big.Int).SetBytes(u[:])
+		m[k] = struct{}{}
+	}
+	t.Log(time.Since(n), len(m))
+}
+
+func TestUUID3(t *testing.T) {
+	m := make(map[string]struct{})
+	n := time.Now()
+	for i := 0; i < 500000; i++ {
+		u := uuid.New()
+		k := hex.EncodeToString(u[:])
+		m[k] = struct{}{}
+	}
+	t.Log(time.Since(n), len(m))
+}
+
+func TestRawMsg(t *testing.T) {
+	d := NewRawData(nil, []byte("abc"))
+	t.Log(d.Id, d.Len())
+	b, _ := ToBytes(d)
+	r := new(RawData)
+	FromBytes(b, r)
+	t.Log(r.Id, r.Len())
 }

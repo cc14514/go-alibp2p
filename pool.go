@@ -200,15 +200,11 @@ func (p *AStreamCache) handleStream(s network.Stream) {
 }
 
 func (p *AStreamCache) doHandleStream(s network.Stream) {
-	pid := string(s.Protocol())
-	log.Infof("alibp2p-service::AStreamCache-HandleStream-start : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
-	defer func() {
-		log.Infof("alibp2p-service::AStreamCache-HandleStream-end : pid=%s , inbound=%v", pid, s.Conn().Stat().Direction == network.DirInbound)
-		p.del(s)
-	}()
 	var (
+		pid         = string(s.Protocol())
 		conn        = s.Conn()
 		sid         = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+		id          = s.Conn().RemotePeer().Pretty()
 		pk, _       = id2pubkey(s.Conn().RemotePeer())
 		ctx, cancel = context.WithCancel(context.Background())
 		rw          = &reuse_conn{
@@ -216,7 +212,13 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 			reader: new(bytes.Buffer),
 			writer: new(bytes.Buffer),
 		}
+		logid = time.Now().UnixNano()
 	)
+	log.Infof("%d# alibp2p-service::HandleStream-start %s@%s inbound=%v", logid, pid, id, s.Conn().Stat().Direction == network.DirInbound)
+	defer func() {
+		log.Infof("%d# alibp2p-service::HandleStream-end %s@%s inbound=%v", logid, pid, id, s.Conn().Stat().Direction == network.DirInbound)
+		p.del(s)
+	}()
 	// TODO How to return error to the handlerFn ?
 	for {
 		var (
@@ -227,34 +229,37 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 		)
 		c, err = FromReader(s, req)
 		if req.Err != "" {
-			log.Error("alibp2p-service::HandleStream_error_from_reader", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", req.Err)
+			log.Errorf("%d# alibp2p-service::HandleStream_error_from_reader %s@%s read_size=%d err=%s", logid, pid, id, c, req.Err)
 			return
 		}
-		log.Debug("alibp2p-service::Got a new stream from ", pid+"@"+s.Conn().RemotePeer().Pretty())
+		log.Debugf("%d# alibp2p-service::HandleStream_request %s@%s msgid=%d msgsize=%d", logid, pid, id, req.ID(), req.Len())
 		if err != nil {
-			log.Error("alibp2p-service::HandleStream_reader", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			log.Errorf("%d# alibp2p-service::HandleStream_reader %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
 		} else if _, err = rw.reader.Write(req.Data); err != nil {
-			log.Error("alibp2p-service::HandleStream_rw", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			log.Errorf("%d# alibp2p-service::HandleStream_rw %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
 		} else if err = p.reg[pid](sid, pubkeyToEcdsa(pk), rw); err != nil {
-			log.Error("alibp2p-service::HandleStream_fn", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			log.Errorf("%d# alibp2p-service::HandleStream_fn %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
 		} else if ret, err = ioutil.ReadAll(rw.writer); err != nil {
-			log.Error("alibp2p-service::HandleStream_ret", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", c, "err", err)
+			log.Errorf("%d# alibp2p-service::HandleStream_ret %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
 		} else if ret != nil {
-			if _, err := ToWriter(s, NewRawData(ret)); err != nil {
-				log.Error("alibp2p-service::HandleStream_writer", pid+"@"+s.Conn().RemotePeer().Pretty(), "size", len(ret), err)
+			rsp := NewRawData(req.ID(), ret)
+			if _, err := ToWriter(s, rsp); err != nil {
+				log.Errorf("%d# alibp2p-service::HandleStream_response_error %s@%s , msgid=%d , size=%d , err=%v", logid, pid, id, rsp.ID(), rsp.Len(), err)
 				cancel()
+			} else {
+				log.Debugf("%d# alibp2p-service::HandleStream_response %s@%s , msgid=%d , size=%d", logid, pid, id, rsp.ID(), rsp.Len())
+				p.msgc.LogSentMessage(1)
+				p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 			}
-			p.msgc.LogSentMessage(1)
-			p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 		}
 		select {
 		case <-ctx.Done():
 			if err != nil {
-				ToWriter(s, &RawData{Err: err.Error()})
+				ToWriter(s, &RawData{Id: req.Id, Err: err.Error()})
 			}
 			return
 		default:

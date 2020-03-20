@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -20,6 +21,7 @@ import (
 
 type (
 	RawData struct {
+		Id   []byte
 		Err  string
 		Data []byte
 	}
@@ -69,8 +71,12 @@ type (
 	}
 )
 
-func NewRawData(data []byte) *RawData {
-	return &RawData{Data: data}
+func NewRawData(id *big.Int, data []byte) *RawData {
+	if id == nil {
+		u := uuid.New()
+		id = new(big.Int).SetBytes(u[:])
+	}
+	return &RawData{Id: id.Bytes(), Data: data}
 }
 
 func ReadSimplePacketHead(r io.Reader) (SimplePacketHead, error) {
@@ -108,4 +114,5 @@ func (header SimplePacketHead) Decode() (msgType uint16, size uint32, err error)
 func (blankValidator) Validate(_ string, _ []byte) error        { return nil }
 func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil }
 
-func (d *RawData) Len() int { return len(d.Data) }
+func (d *RawData) Len() int     { return len(d.Data) }
+func (d *RawData) ID() *big.Int { return new(big.Int).SetBytes(d.Id) }
