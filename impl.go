@@ -255,6 +255,10 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
+	if self.asc.has(protocolID) {
+		self.asc.lockpid(protocolID)
+		defer self.asc.unlockpid(protocolID)
+	}
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
