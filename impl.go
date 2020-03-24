@@ -266,8 +266,8 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
-		log.Error("alibp2p::SendMsgAfterClose", "id", to, "protocolID", protocolID, "err", err.Error())
-		self.host.Network().ClosePeer(id)
+		log.Error("alibp2p::SendMsgAfterClose", "id", id, "protocolID", protocolID, "err", err.Error())
+		//self.host.Network().ClosePeer(id)
 		return err
 	}
 	if s != nil && !self.asc.has(protocolID) {
@@ -547,7 +547,9 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 					preRtn = append(make([]byte, 8), []byte(err.Error())...)
 				}
 			}
+			log.Debug("alibp2p-service::OnConnected-callbackFn-start", "id", conn.RemotePeer().Pretty())
 			callbackFn(in, sid, pubkey, preRtn)
+			log.Debug("alibp2p-service::OnConnected-callbackFn-end", "id", conn.RemotePeer().Pretty())
 		},
 	})
 }
