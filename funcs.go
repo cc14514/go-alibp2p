@@ -169,8 +169,7 @@ var (
 				// 这里不用重复 addAddrs ， Connect 已经 add 过了
 				//ph.Peerstore().AddAddrs(p.ID, p.Addrs, _ttl)
 				if err := ph.Connect(ctx, p); err != nil {
-					//log.Debug("connect failed", p.ID)
-					//log.Printf("failed to connect with %v: %s", p.ID, err)
+					log.Debug("alibp2p-service::connectFn: connect failed", p.ID, err.Error())
 					errs <- err
 					return
 				}
@@ -183,9 +182,11 @@ var (
 		var err error
 		for err = range errs {
 			if err != nil {
+				log.Debug("alibp2p-service::connectFn: connect error :", count, err.Error())
 				count++
 			}
 		}
+		log.Debug("alibp2p-service::connectFn: connect over :", count)
 		if count == len(peers) {
 			return fmt.Errorf("failed to connect. %s", err)
 		}

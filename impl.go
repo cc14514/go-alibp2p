@@ -11,6 +11,7 @@ import (
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	discoveryopt "github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/metrics"
@@ -19,7 +20,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+
 	discovery "github.com/libp2p/go-libp2p-discovery"
+
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
@@ -142,6 +145,7 @@ func NewService(cfg Config) Alibp2pService {
 		bwc:              bwc,
 		rwc:              rwc,
 		msgc:             msgc,
+		nsttl:            make(map[string]time.Duration),
 	}
 
 	service.isDirectFn = func(id string) bool {
@@ -302,11 +306,24 @@ func (self *Service) Connect(url string) error {
 	return self.host.Connect(self.ctx, peer.AddrInfo{ID: peerid, Addrs: []ma.Multiaddr{targetAddr}})
 }
 
+// 设置 Advertised 的 namespace 生命周期，这个值需要提前设置，以便 Providers 按照设置来提供心跳
+// ttl 单位为秒
+func (self *Service) getAdvertiseTTL(ns string) time.Duration {
+	if ttl := self.nsttl[ns]; ttl > 0 {
+		return ttl
+	}
+	return def_nsttl
+}
+
+func (self *Service) SetAdvertiseTTL(ns string, ttl time.Duration) {
+	self.nsttl[ns] = ttl
+}
+
 func (self *Service) Advertise(ctx context.Context, ns string) {
 	/*
 		这里使用了 DHT 实现的接口
 		代码：github.com/cc14514/go-libp2p-kad-dht/providers/providers.go
-		GC 规则 :
+		默认 GC 规则 :
 			24 小时清理一次， Advertise 会每隔 3 小时汇报一次，以免被 GC
 			...
 				case gcTime.Sub(t) > ProvideValidity: // ProvideValidity = 24H , 意思是 key 的 有效期是 24 小时
@@ -317,9 +334,14 @@ func (self *Service) Advertise(ctx context.Context, ns string) {
 				}
 			...
 	*/
-	discovery.Advertise(ctx, self.routingDiscovery, ns)
+	self.getAdvertiseTTL(ns)
+	discovery.Advertise(ctx, self.routingDiscovery, ns, discoveryopt.TTL(self.getAdvertiseTTL(ns)*time.Second))
 }
 
+// TODO 在 DHT 包里实现 ttl 验证
+// TODO 在 DHT 包里实现 ttl 验证
+// TODO 在 DHT 包里实现 ttl 验证
+// TODO 在 DHT 包里实现 ttl 验证
 func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, error) {
 	var (
 		err error
@@ -597,9 +619,6 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 }
 
 func (self *Service) Start() {
-	fmt.Println(">>>> alibp2p-service >>>>")
-	fmt.Println("logvsn", logvsn)
-	fmt.Println("<<<< alibp2p-service <<<<")
 	startCounter(self)
 	for _, notify := range self.notifiee {
 		self.host.Network().Notify(notify)
@@ -607,7 +626,13 @@ func (self *Service) Start() {
 	if self.cfg.Discover {
 		self.bootstrap()
 	}
-
+	fmt.Println(">>>> alibp2p-service >>>>")
+	fmt.Println("logvsn", logvsn)
+	for ns, ttl := range self.nsttl {
+		os.Setenv("advertise_"+ns, fmt.Sprintf("%d", ttl))
+		fmt.Println("advertise:", ns, " , ttl:", ttl)
+	}
+	fmt.Println("<<<< alibp2p-service <<<<")
 }
 
 func (self *Service) Table() map[string][]string {
@@ -728,7 +753,7 @@ func (self *Service) Get(k string) ([]byte, error) {
 }
 
 func (self *Service) BootstrapOnce() error {
-	err := connectFn(self.ctx, self.host, self.bootnodes)
+	err := connectFn(context.Background(), self.host, self.bootnodes)
 	if err != nil {
 		log.Debug("alibp2p-service::bootstrap-once-conn-error", "err", err)
 	}
@@ -770,8 +795,10 @@ func (self *Service) bootstrap() error {
 							others = self.peersWithoutBootnodes()
 							total  = len(others)
 						)
-						log.Debug("alibp2p-service::bootstrap looping")
-						err := connectFn(self.ctx, self.host, self.bootnodes)
+						log.Debug("alibp2p-service::bootstrap looping", self.bootnodes)
+						log.Debug("alibp2p-service::connectFn-start")
+						err := connectFn(context.Background(), self.host, self.bootnodes)
+						log.Debug("alibp2p-service::connectFn-end", err)
 						if err == nil {
 							log.Debug("alibp2p-service::bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
@@ -789,7 +816,7 @@ func (self *Service) bootstrap() error {
 								limit = total
 							}
 							tasks := randPeers(others, limit)
-							err := connectFn(self.ctx, self.host, tasks)
+							err := connectFn(context.Background(), self.host, tasks)
 							log.Debug("alibp2p-service::bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
 						}
 					}

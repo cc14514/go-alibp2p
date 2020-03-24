@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const logvsn = "200320-1"
+const logvsn = "200324-1"
 
 const (
 	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
@@ -44,6 +44,7 @@ var (
 	//def_maxsize  int64 = 512
 	def_maxsize int64 = 13 * 1024 * 1024
 	//_maxsize  int64 = 13 * 1024 * 1024
+	def_nsttl = time.Duration(86400) // 1hour
 )
 
 func (cfg Config) ProtectorOpt() (libp2p.Option, error) {

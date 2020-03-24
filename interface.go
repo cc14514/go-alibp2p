@@ -86,6 +86,8 @@ type (
 		Protect(id, tag string) error
 		Unprotect(id, tag string) (bool, error)
 
+		// 设置 ns 的全局 ttl 值
+		SetAdvertiseTTL(ns string, ttl time.Duration)
 		Advertise(ctx context.Context, ns string)
 
 		FindProviders(ctx context.Context, ns string) ([]string, error)
