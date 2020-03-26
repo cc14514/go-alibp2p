@@ -119,13 +119,13 @@ func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 
 func (p *AStreamCache) del(s network.Stream) {
 	streamkey, sessionkey := newStreamSessionKey(s)
-	p.cleanlock(streamkey.Id(), streamkey.Protoid())
 	p.del2(streamkey.Id(), streamkey.Protoid(), sessionkey)
 }
 
 func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	p.cleanlock(to, protoid)
 	log.Debug("alibp2p-service::AStreamCache-del2.input", to, protoid, session, len(p.pool))
 	if protoid == "" {
 		// 1: protoid == nil 删除全部包含 to 的 key, 不会很多，遍历即可
