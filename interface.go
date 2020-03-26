@@ -70,6 +70,7 @@ type (
 		Table() map[string][]string // map => {id:addrs}
 		Conns() (direct []string, relay []string)
 		Peers() (direct []string, relay map[string][]string, total int)
+		PeersWithDirection() (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int)
 
 		PutPeerMeta(id, key string, v interface{}) error
 		GetPeerMeta(id, key string) (interface{}, error)

@@ -684,6 +684,36 @@ func (self *Service) Conns() (direct []string, relay []string) {
 	return direct, relay
 }
 
+func (self *Service) PeersWithDirection() (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int) {
+	direct, relay, total = make([]PeerDirection, 0), make(map[PeerDirection][]PeerDirection), 0
+	rl := make([]PeerDirection, 0)
+	for _, c := range self.host.Network().Conns() {
+		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
+		taddr, _ := maddr.MarshalText()
+		if strings.Contains(string(taddr), "p2p-circuit") {
+			pd := NewPeerDirection(string(taddr), c.Stat().Direction)
+			rl = append(rl, pd)
+		} else {
+			pd := NewPeerDirection(c.RemotePeer().Pretty(), c.Stat().Direction)
+			direct = append(direct, pd)
+			total = total + 1
+		}
+	}
+	for _, r := range rl {
+		arr := strings.Split(r.ID(), "/p2p-circuit")
+		f, t := arr[0][6:], arr[1][6:]
+		rarr, ok := relay[NewPeerDirection(f, r.Direction())]
+		if !ok {
+			rarr = make([]PeerDirection, 0)
+		}
+		rarr = append(rarr, NewPeerDirection(t, r.Direction()))
+		relay[NewPeerDirection(f, r.Direction())] = rarr
+		total += 1
+	}
+	return direct, relay, total
+}
+
 func (self *Service) Peers() (direct []string, relay map[string][]string, total int) {
 	direct, relay, total = make([]string, 0), make(map[string][]string), 0
 	dl, rl := self.Conns()

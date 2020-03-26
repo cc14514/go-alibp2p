@@ -15,6 +15,7 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	"io"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 )
@@ -117,3 +118,39 @@ func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil 
 
 func (d *RawData) Len() int     { return len(d.Data) }
 func (d *RawData) ID() *big.Int { return new(big.Int).SetBytes(d.Id) }
+
+type PeerDirection string
+
+func NewPeerDirection(id string, dir network.Direction) PeerDirection {
+	switch dir {
+	case network.DirInbound:
+		return PeerDirection(id + "(IN)")
+	case network.DirOutbound:
+		return PeerDirection(id + "(OUT)")
+	default:
+		return PeerDirection(id)
+	}
+}
+
+func (o PeerDirection) Direction() network.Direction {
+	if strings.Contains(string(o), "(IN)") {
+		return network.DirInbound
+	}
+	if strings.Contains(string(o), "(OUT)") {
+		return network.DirOutbound
+	}
+	return network.DirUnknown
+}
+
+func (o PeerDirection) Pretty() string {
+	if strings.Contains(o.ID(), "ipfs") {
+		return strings.Split(o.ID(), "ipfs/")[1]
+	}
+	return o.ID()
+}
+func (o PeerDirection) ID() string {
+	id := strings.Split(string(o), "(")[0]
+	return id
+}
+
+func (o PeerDirection) String() string { return string(o) }
