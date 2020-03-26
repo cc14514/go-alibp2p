@@ -224,7 +224,8 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 	log.Infof("%d# alibp2p-service::HandleStream-start %s@%s inbound=%v", logid, pid, id, s.Conn().Stat().Direction == network.DirInbound)
 	defer func() {
 		log.Infof("%d# alibp2p-service::HandleStream-end %s@%s inbound=%v", logid, pid, id, s.Conn().Stat().Direction == network.DirInbound)
-		p.del(s)
+		//p.del(s)
+		fullClose(s)
 	}()
 	// TODO How to return error to the handlerFn ?
 	for {

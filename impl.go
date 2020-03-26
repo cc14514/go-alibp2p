@@ -262,13 +262,15 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	if self.asc.has(protocolID) {
+		log.Error("alibp2p::SendMsgAfterClose-lock:try", "id", to, "protocolID", protocolID)
 		self.asc.lockpid(protocolID)
+		log.Error("alibp2p::SendMsgAfterClose-lock:success", "id", to, "protocolID", protocolID)
 		defer self.asc.unlockpid(protocolID)
 	}
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
-		log.Error("alibp2p::SendMsgAfterClose", "id", id, "protocolID", protocolID, "err", err.Error())
+		log.Error("alibp2p::SendMsgAfterClose-error-1", "id", id, "protocolID", protocolID, "err", err.Error())
 		//self.host.Network().ClosePeer(id)
 		return err
 	}
@@ -277,11 +279,20 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	} else {
 		// reuse channel
 		rsp := new(RawData)
+		s.SetReadDeadline(time.Now().Add(2 * time.Second))
 		_, err := FromReader(s, rsp)
 		if err != nil {
+			log.Error("alibp2p::SendMsgAfterClose-error-2", "id", id, "protocolID", protocolID, "err", err.Error())
+			self.asc.del(s)
 			return err
 		}
+		defer func() {
+			if s != nil {
+				s.SetReadDeadline(notimeout)
+			}
+		}()
 		if rsp.Err != "" {
+			log.Error("alibp2p::SendMsgAfterClose-error-3", "id", id, "protocolID", protocolID, "err", err.Error())
 			return errors.New(rsp.Err)
 		}
 		log.Debugf("alibp2p::SendMsgAfterClose-ack %s@%s msgid=%d", protocolID, to, rsp.ID())
