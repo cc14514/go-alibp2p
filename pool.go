@@ -301,6 +301,9 @@ func (p *AStreamCache) lockpid(id, pid string) {
 }
 
 func (p *AStreamCache) cleanlock(id, pid string) {
+	if id == "" || pid == "" {
+		return
+	}
 	p.reglock.Delete(pid + id)
 	log.Debug("alibp2p-service::AStreamCache-cleanlock", pid, id)
 }
