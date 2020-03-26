@@ -104,12 +104,12 @@ func NewService(cfg Config) Alibp2pService {
 		}),
 	}
 
+	optlist = append(optlist, libp2p.EnableAutoRelay())
 	if cfg.Relay {
 		//os.Setenv("alibp2prelay", "enable") // 在这里使用 go-libp2p/p2p/protocol/identify/id.go:225
-		optlist = append(optlist,
-			libp2p.EnableAutoRelay(),
-			libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
-		)
+		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop))
+	} else {
+		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery))
 	}
 
 	if p, err := cfg.ProtectorOpt(); err == nil {
