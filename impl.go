@@ -279,21 +279,20 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	} else {
 		// reuse channel
 		rsp := new(RawData)
-		s.SetReadDeadline(time.Now().Add(2 * time.Second))
+		s.SetReadDeadline(time.Now().Add(3 * time.Second))
 		_, err := FromReader(s, rsp)
 		if err != nil {
 			log.Error("alibp2p::SendMsgAfterClose-error-2", "id", id, "protocolID", protocolID, "err", err.Error())
-			self.asc.del(s)
+			self.asc.del2(to, protocolID, "")
 			return err
 		}
-		defer func() {
-			if s != nil {
-				s.SetReadDeadline(notimeout)
-			}
-		}()
 		if rsp.Err != "" {
+			self.asc.del2(to, protocolID, "")
 			log.Error("alibp2p::SendMsgAfterClose-error-3", "id", id, "protocolID", protocolID, "err", err.Error())
 			return errors.New(rsp.Err)
+		}
+		if s != nil {
+			s.SetReadDeadline(notimeout)
 		}
 		log.Debugf("alibp2p::SendMsgAfterClose-ack %s@%s msgid=%d", protocolID, to, rsp.ID())
 	}
@@ -569,7 +568,9 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
 	if self.asc.has(proto) {
+		log.Error("alibp2p::RequestWithTimeout-lock:try", "id", to, "protocolID", proto)
 		self.asc.lockpid(proto)
+		log.Error("alibp2p::RequestWithTimeout-lock:success", "id", to, "protocolID", proto)
 		defer self.asc.unlockpid(proto)
 	}
 	var buf []byte
@@ -593,16 +594,16 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 				}
 			}
 		}()
-
 		if self.asc.has(proto) {
 			rsp := new(RawData)
 			if _, err = FromReader(s, rsp); err != nil {
 				self.asc.del2(to, proto, "")
+				log.Errorf("alibp2p::RequestWithTimeout-error-1 %s@%s msgid=%d err=%s", proto, to, rsp.ID(), rsp.Err)
 				return nil, err
 			}
 			if rsp.Err != "" {
 				self.asc.del2(to, proto, "")
-				log.Errorf("alibp2p::RequestWithTimeout-error %s@%s msgid=%d err=%s", proto, to, rsp.ID(), rsp.Err)
+				log.Errorf("alibp2p::RequestWithTimeout-error-2 %s@%s msgid=%d err=%s", proto, to, rsp.ID(), rsp.Err)
 				return nil, errors.New(rsp.Err)
 			}
 			log.Debugf("alibp2p::RequestWithTimeout-ack %s@%s msgid=%d", proto, to, rsp.ID())
