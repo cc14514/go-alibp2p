@@ -53,10 +53,11 @@ type (
 		// { aconnkey -> { session -> conn } }
 		pool    map[StreamKey]map[SessionKey]*reuse_stream
 		reg     map[string]StreamHandler
-		reglock map[string]*sync.Mutex
-		lock    *sync.RWMutex
-		msgc    metrics.Reporter
-		expire  int64
+		reglock *sync.Map
+		//reglock map[string]*sync.Mutex
+		lock   *sync.RWMutex
+		msgc   metrics.Reporter
+		expire int64
 	}
 )
 
@@ -109,14 +110,16 @@ func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 		pool:    make(map[StreamKey]map[SessionKey]*reuse_stream),
 		lock:    new(sync.RWMutex),
 		reg:     make(map[string]StreamHandler),
-		reglock: make(map[string]*sync.Mutex),
-		msgc:    msgc,
-		expire:  def_expire,
+		reglock: new(sync.Map),
+		//reglock: make(map[string]*sync.Mutex),
+		msgc:   msgc,
+		expire: def_expire,
 	}
 }
 
 func (p *AStreamCache) del(s network.Stream) {
 	streamkey, sessionkey := newStreamSessionKey(s)
+	p.cleanlock(streamkey.Id(), streamkey.Protoid())
 	p.del2(streamkey.Id(), streamkey.Protoid(), sessionkey)
 }
 
@@ -283,19 +286,32 @@ func (p *AStreamCache) regist(pid string, handler StreamHandler) {
 		panic("alibp2p-service::ReuseStreamHandler Duplicate Registration")
 	}
 	p.reg[pid] = handler
-	p.reglock[pid] = new(sync.Mutex)
+	//p.reglock[pid] = new(sync.Mutex)
+	p.reglock.Store(pid, new(sync.Mutex))
 }
 
-func (p *AStreamCache) lockpid(pid string) {
-	lock, ok := p.reglock[pid]
+func (p *AStreamCache) lockpid(id, pid string) {
+	_, ok := p.reglock.Load(pid)
 	if ok {
-		lock.Lock()
+		log.Debug("alibp2p-service::AStreamCache-lock:try", pid, id)
+		v, _ := p.reglock.LoadOrStore(pid+id, new(sync.Mutex))
+		v.(*sync.Mutex).Lock()
+		log.Debug("alibp2p-service::AStreamCache-lock:success", pid, id)
 	}
 }
 
-func (p *AStreamCache) unlockpid(pid string) {
-	lock, ok := p.reglock[pid]
+func (p *AStreamCache) cleanlock(id, pid string) {
+	p.reglock.Delete(pid + id)
+	log.Debug("alibp2p-service::AStreamCache-cleanlock", pid, id)
+}
+
+func (p *AStreamCache) unlockpid(id, pid string) {
+	_, ok := p.reglock.Load(pid)
 	if ok {
-		lock.Unlock()
+		log.Debug("alibp2p-service::AStreamCache-unlock:try", pid, id)
+		if v, ok := p.reglock.Load(pid + id); ok {
+			v.(*sync.Mutex).Unlock()
+			log.Debug("alibp2p-service::AStreamCache-unlock:success", pid, id)
+		}
 	}
 }

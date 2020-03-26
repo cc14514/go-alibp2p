@@ -263,9 +263,9 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	if self.asc.has(protocolID) {
 		log.Error("alibp2p::SendMsgAfterClose-lock:try", "id", to, "protocolID", protocolID)
-		self.asc.lockpid(protocolID)
+		self.asc.lockpid(to, protocolID)
 		log.Error("alibp2p::SendMsgAfterClose-lock:success", "id", to, "protocolID", protocolID)
-		defer self.asc.unlockpid(protocolID)
+		defer self.asc.unlockpid(to, protocolID)
 	}
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
@@ -381,15 +381,11 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 	return self.sendMsg(to, protocolID, msg, notimeout)
 }
 
-func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (
-	peerid peer.ID,
-	s network.Stream,
-	total int,
-	err error) {
+func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peerid peer.ID, s network.Stream, total int, err error) {
+	peerid, err = peer.IDB58Decode(to)
 	defer func() {
-		tid, _ := peer.IDB58Decode(to)
 		self.msgc.LogSentMessage(1)
-		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), tid)
+		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), peerid)
 	}()
 
 	if self.asc.has(protocolID) {
@@ -412,7 +408,6 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		}
 	}
 
-	peerid, err = peer.IDB58Decode(to)
 	if err != nil {
 		var (
 			ipfsaddr ma.Multiaddr
@@ -568,10 +563,10 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
 	if self.asc.has(proto) {
-		log.Error("alibp2p::RequestWithTimeout-lock:try", "id", to, "protocolID", proto)
-		self.asc.lockpid(proto)
-		log.Error("alibp2p::RequestWithTimeout-lock:success", "id", to, "protocolID", proto)
-		defer self.asc.unlockpid(proto)
+		log.Debug("alibp2p::RequestWithTimeout-lock:try", "id", to, "protocolID", proto)
+		self.asc.lockpid(to, proto)
+		log.Debug("alibp2p::RequestWithTimeout-lock:success", "id", to, "protocolID", proto)
+		defer self.asc.unlockpid(to, proto)
 	}
 	var buf []byte
 	tot := notimeout
@@ -598,7 +593,7 @@ func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout ti
 			rsp := new(RawData)
 			if _, err = FromReader(s, rsp); err != nil {
 				self.asc.del2(to, proto, "")
-				log.Errorf("alibp2p::RequestWithTimeout-error-1 %s@%s msgid=%d err=%s", proto, to, rsp.ID(), rsp.Err)
+				log.Errorf("alibp2p::RequestWithTimeout-error-1 %s@%s msgid=%d err=%s", proto, to, rsp.ID(), err.Error())
 				return nil, err
 			}
 			if rsp.Err != "" {
