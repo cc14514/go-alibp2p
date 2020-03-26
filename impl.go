@@ -103,13 +103,15 @@ func NewService(cfg Config) Alibp2pService {
 			return router, nil
 		}),
 	}
+
 	if cfg.Relay {
-		os.Setenv("alibp2prelay", "enable") // 在这里使用 go-libp2p/p2p/protocol/identify/id.go:225
+		//os.Setenv("alibp2prelay", "enable") // 在这里使用 go-libp2p/p2p/protocol/identify/id.go:225
 		optlist = append(optlist,
 			libp2p.EnableAutoRelay(),
 			libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop),
 		)
 	}
+
 	if p, err := cfg.ProtectorOpt(); err == nil {
 		optlist = append(optlist, p)
 	}
