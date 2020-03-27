@@ -299,7 +299,7 @@ func (p *AStreamCache) takelock(id, pid string) (err error) {
 	if ok {
 		v, ok := p.reglock.LoadOrStore(pid+id, make(chan struct{}, 1))
 		log.Debugf("alibp2p-service::AStreamCache-lock:try : %s@%s load=%v", pid, id, ok)
-		t := time.NewTimer(10 * time.Second)
+		t := time.NewTimer(30 * time.Second)
 		defer func() {
 			t.Stop()
 			if recover() != nil {
@@ -336,9 +336,10 @@ func (p *AStreamCache) cleanlock(id, pid string) {
 func (p *AStreamCache) unlock(id, pid string) (err error) {
 	_, ok := p.reglock.Load(pid)
 	if ok {
-		log.Debugf("alibp2p-service::AStreamCache-unlock:try %s@%s", pid, id)
-		if v, ok := p.reglock.Load(pid + id); ok {
-			t := time.NewTimer(10 * time.Second)
+		v, ok := p.reglock.Load(pid + id)
+		log.Debugf("alibp2p-service::AStreamCache-unlock:try %s@%s load=%v", pid, id, ok)
+		if ok {
+			t := time.NewTimer(30 * time.Second)
 			defer func() {
 				t.Stop()
 				if recover() != nil {
@@ -378,7 +379,7 @@ func (p *AStreamCache) cleanlock(id, pid string) {
 	log.Debug("alibp2p-service::AStreamCache-cleanlock", pid, id)
 }
 
-func (p *AStreamCache) unlock(id, pid string) {
+func (p *AStreamCache) unlock(id, pid string) error {
 	_, ok := p.reglock.Load(pid)
 	if ok {
 		log.Debug("alibp2p-service::AStreamCache-unlock:try", pid, id)
@@ -387,5 +388,6 @@ func (p *AStreamCache) unlock(id, pid string) {
 			log.Debug("alibp2p-service::AStreamCache-unlock:success", pid, id)
 		}
 	}
+	return nil
 }
 */

@@ -567,7 +567,6 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
 	if self.asc.has(proto) {
 		log.Debug("alibp2p::RequestWithTimeout-lock:try", "id", to, "protocolID", proto)
-		self.asc.takelock(to, proto)
 		if err := self.asc.takelock(to, proto); err != nil {
 			log.Error("alibp2p::RequestWithTimeout-lock:fail", "id", to, "protocolID", proto, "err", err.Error())
 			return nil, err
