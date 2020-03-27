@@ -263,8 +263,10 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 				cancel()
 			} else {
 				log.Debugf("%d# alibp2p-service::HandleStream_response %s@%s , msgid=%d , size=%d", logid, pid, id, rsp.ID(), rsp.Len())
-				p.msgc.LogSentMessage(1)
-				p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+				if p.msgc != nil {
+					p.msgc.LogSentMessage(1)
+					p.msgc.LogSentMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+				}
 			}
 		}
 		select {
@@ -274,8 +276,10 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 			}
 			return
 		default:
-			p.msgc.LogRecvMessage(1)
-			p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+			if p.msgc != nil {
+				p.msgc.LogRecvMessage(1)
+				p.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+			}
 		}
 	}
 
@@ -287,10 +291,75 @@ func (p *AStreamCache) regist(pid string, handler StreamHandler) {
 	}
 	p.reg[pid] = handler
 	//p.reglock[pid] = new(sync.Mutex)
-	p.reglock.Store(pid, new(sync.Mutex))
+	p.reglock.Store(pid, make(chan struct{}))
 }
 
-func (p *AStreamCache) lockpid(id, pid string) {
+func (p *AStreamCache) takelock(id, pid string) (err error) {
+	_, ok := p.reglock.Load(pid)
+	if ok {
+		v, ok := p.reglock.LoadOrStore(pid+id, make(chan struct{}, 1))
+		log.Debugf("alibp2p-service::AStreamCache-lock:try : %s@%s load=%v", pid, id, ok)
+		t := time.NewTimer(10 * time.Second)
+		defer func() {
+			t.Stop()
+			if recover() != nil {
+				err = fmt.Errorf("take lock fail , lost stream : %s@%s", pid, id)
+			}
+		}()
+		select {
+		case v.(chan struct{}) <- struct{}{}:
+			log.Debugf("alibp2p-service::AStreamCache-lock:success : %s@%s", pid, id)
+		case <-t.C:
+			log.Debugf("alibp2p-service::AStreamCache-lock:timeout : %s@%s", pid, id)
+			err = fmt.Errorf("take lock timeout : %s@%s", pid, id)
+		}
+	}
+	return
+}
+
+func (p *AStreamCache) cleanlock(id, pid string) {
+	if id == "" || pid == "" {
+		return
+	}
+	if v, ok := p.reglock.Load(pid + id); ok {
+		p.reglock.Delete(pid + id)
+		defer func() {
+			if r := recover(); r != nil {
+				// ignoe
+			}
+		}()
+		close(v.(chan struct{}))
+	}
+	log.Debugf("alibp2p-service::AStreamCache-cleanlock : %s@%s", pid, id)
+}
+
+func (p *AStreamCache) unlock(id, pid string) (err error) {
+	_, ok := p.reglock.Load(pid)
+	if ok {
+		log.Debugf("alibp2p-service::AStreamCache-unlock:try %s@%s", pid, id)
+		if v, ok := p.reglock.Load(pid + id); ok {
+			t := time.NewTimer(10 * time.Second)
+			defer func() {
+				t.Stop()
+				if recover() != nil {
+					err = fmt.Errorf("release lock fail , lost stream : %s@%s", pid, id)
+				}
+			}()
+			select {
+			case <-v.(chan struct{}):
+				log.Debugf("alibp2p-service::AStreamCache-unlock:success : %s@%s", pid, id)
+				return nil
+			case <-t.C:
+				log.Debugf("alibp2p-service::AStreamCache-unlock:timeout : %s@%s", pid, id)
+				return fmt.Errorf("release lock timeout : %s@%s", pid, id)
+			}
+		}
+	}
+	return nil
+}
+
+/*
+func (p *AStreamCache) takelock(id, pid string) error {
 	_, ok := p.reglock.Load(pid)
 	if ok {
 		log.Debug("alibp2p-service::AStreamCache-lock:try", pid, id)
@@ -298,6 +367,7 @@ func (p *AStreamCache) lockpid(id, pid string) {
 		v.(*sync.Mutex).Lock()
 		log.Debug("alibp2p-service::AStreamCache-lock:success", pid, id)
 	}
+	return nil
 }
 
 func (p *AStreamCache) cleanlock(id, pid string) {
@@ -308,7 +378,7 @@ func (p *AStreamCache) cleanlock(id, pid string) {
 	log.Debug("alibp2p-service::AStreamCache-cleanlock", pid, id)
 }
 
-func (p *AStreamCache) unlockpid(id, pid string) {
+func (p *AStreamCache) unlock(id, pid string) {
 	_, ok := p.reglock.Load(pid)
 	if ok {
 		log.Debug("alibp2p-service::AStreamCache-unlock:try", pid, id)
@@ -318,3 +388,4 @@ func (p *AStreamCache) unlockpid(id, pid string) {
 		}
 	}
 }
+*/

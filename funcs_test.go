@@ -33,6 +33,7 @@ import (
 	"math/big"
 	"net"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -273,4 +274,25 @@ func TestRawMsg(t *testing.T) {
 	r := new(RawData)
 	FromBytes(b, r)
 	t.Log(r.Id, r.Len())
+}
+
+func TestLock(t *testing.T) {
+	s := time.Now()
+	m := new(sync.Map)
+	for i := 0; i < 1000000; i++ {
+		l, _ := m.LoadOrStore(i, new(sync.Mutex))
+		l.(*sync.Mutex).Lock()
+	}
+	fmt.Println("take lock 100w : ", time.Since(s))
+
+	<-time.After(10 * time.Second)
+	s = time.Now()
+	for i := 0; i < 1000000; i++ {
+		//v, _ := m.Load(i)
+		//v.(*sync.Mutex).Unlock()
+		m.Delete(i)
+	}
+	fmt.Println("clean lock 100w : ", time.Since(s))
+
+	<-time.After(3600 * time.Second)
 }
