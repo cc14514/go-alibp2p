@@ -138,8 +138,8 @@ func (k *KeyMutex) Lock(namespace, key string) (err error) {
 		t := time.NewTimer(k.timeout)
 		defer func() {
 			t.Stop()
-			if recover() != nil {
-				err = fmt.Errorf("take lock fail , lost stream : %s@%s", namespace, key)
+			if ee := recover(); ee != nil {
+				err = fmt.Errorf("take lock fail , lost stream : %s@%s : %v", namespace, key, ee)
 			}
 		}()
 		select {
@@ -189,7 +189,7 @@ func (k *KeyMutex) Clean(namespace, key string) {
 		return
 	}
 	if v, ok := k.reglock.Load(k.hash(namespace, key)); ok {
-		k.reglock.Delete(namespace + key)
+		k.reglock.Delete(k.hash(namespace, key))
 		defer func() {
 			if r := recover(); r != nil {
 				// ignoe
