@@ -262,12 +262,12 @@ func (self *Service) SetStreamHandler(protoid string, handler func(s network.Str
 //TODO add by liangc : connMgr protected / unprotected setting
 func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	if self.asc.has(protocolID) {
-		log.Error("alibp2p::SendMsgAfterClose-lock:try", "id", to, "protocolID", protocolID)
+		log.Debug("alibp2p::SendMsgAfterClose-lock:try", "id", to, "protocolID", protocolID)
 		if err := self.asc.takelock(to, protocolID); err != nil {
 			log.Error("alibp2p::SendMsgAfterClose-lock:fail", "id", to, "protocolID", protocolID, "err", err.Error())
 			return err
 		}
-		log.Error("alibp2p::SendMsgAfterClose-lock:success", "id", to, "protocolID", protocolID)
+		log.Debug("alibp2p::SendMsgAfterClose-lock:success", "id", to, "protocolID", protocolID)
 		defer self.asc.unlock(to, protocolID)
 	}
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
