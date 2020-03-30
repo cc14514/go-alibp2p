@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -19,6 +20,8 @@ import (
 	"sync"
 	"time"
 )
+
+var ns_notfound error = errors.New("Namespace not registed")
 
 type (
 	RawData struct {
@@ -70,6 +73,12 @@ type (
 		closeCh           chan struct{}
 		close             bool
 		gc                time.Duration
+	}
+	// 关于 key 的互斥锁
+	KeyMutex struct {
+		reglock *sync.Map
+		timeout time.Duration
+		kcache  *lru.Cache
 	}
 )
 

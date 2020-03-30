@@ -19,39 +19,3 @@
  *************************************************************************/
 
 package alibp2p
-
-import (
-	"fmt"
-	"sync"
-	"testing"
-	"time"
-)
-
-func TestStreamLock(t *testing.T) {
-	id := "hello"
-	pid := "foobar"
-	asc := NewAStreamCatch(nil)
-	asc.reglock.Store(pid, make(chan struct{}))
-	wg := new(sync.WaitGroup)
-	s := time.Now()
-	m, n := 0, 0
-	for j := 0; j < 10000; j++ {
-		wg.Add(1)
-		go func(i int) {
-			defer func() {
-				wg.Done()
-				err := asc.unlock(id, pid)
-				if err != nil {
-					m += 1
-				}
-			}()
-			err := asc.takelock(id, pid)
-			if err != nil {
-				n += 1
-			}
-		}(j)
-	}
-	wg.Wait()
-	asc.cleanlock(id, pid)
-	fmt.Println(time.Since(s), m, n)
-}

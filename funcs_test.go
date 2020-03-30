@@ -277,22 +277,36 @@ func TestRawMsg(t *testing.T) {
 }
 
 func TestLock(t *testing.T) {
-	s := time.Now()
-	m := new(sync.Map)
-	for i := 0; i < 1000000; i++ {
-		l, _ := m.LoadOrStore(i, new(sync.Mutex))
-		l.(*sync.Mutex).Lock()
+	ns := "foobar"
+	key := "hello"
+	km := NewKeyMutex(7 * time.Second)
+	km.Regist(ns)
+	wg := new(sync.WaitGroup)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(j int) {
+			defer wg.Done()
+			fmt.Println(j, "lock-try")
+			if err := km.Lock(ns, key); err != nil {
+				fmt.Println(j, "lock-fail", err)
+				return
+			}
+			fmt.Println(j, "lock-success")
+			<-time.After(1 * time.Second)
+			fmt.Println(j, "unlock-try")
+			if err := km.Unlock(ns, key); err != nil {
+				fmt.Println(j, "unlock-fail", err)
+				return
+			}
+			fmt.Println(j, "unlock-success")
+		}(i)
+		if i == 6 {
+			km.Clean(ns, key)
+			fmt.Println(i, "clean")
+		}
 	}
-	fmt.Println("take lock 100w : ", time.Since(s))
+	wg.Wait()
+	h := km.hash("/premsg/1.0.0", "16Uiu2HAm39zRzVr5JK6P1WCba7ew8L5CBT4r5e3wcZ8V2zQRvWSM")
+	fmt.Println(h)
 
-	<-time.After(10 * time.Second)
-	s = time.Now()
-	for i := 0; i < 1000000; i++ {
-		//v, _ := m.Load(i)
-		//v.(*sync.Mutex).Unlock()
-		m.Delete(i)
-	}
-	fmt.Println("clean lock 100w : ", time.Since(s))
-
-	<-time.After(3600 * time.Second)
 }

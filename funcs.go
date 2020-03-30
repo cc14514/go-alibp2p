@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
+	lru "github.com/hashicorp/golang-lru"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -113,6 +115,102 @@ func (a *AsyncRunner) Apply(fn func(ctx context.Context, args []interface{}), ar
 		a.Unlock()
 		a.fnCh <- &asyncFn{fn, args}
 	}
+}
+
+func NewKeyMutex(timeout time.Duration) *KeyMutex {
+	cache, _ := lru.New(1024)
+	return &KeyMutex{
+		reglock: new(sync.Map),
+		timeout: timeout,
+		kcache:  cache,
+	}
+}
+
+func (k *KeyMutex) Regist(namespace string) {
+	k.reglock.Store(namespace, make(chan struct{}))
+}
+
+func (k *KeyMutex) Lock(namespace, key string) (err error) {
+	_, ok := k.reglock.Load(namespace)
+	if ok {
+		v, ok := k.reglock.LoadOrStore(k.hash(namespace, key), make(chan struct{}, 1))
+		log.Debugf("alibp2p-service::KeyMutex-lock:try : %s@%s load=%v", namespace, key, ok)
+		t := time.NewTimer(k.timeout)
+		defer func() {
+			t.Stop()
+			if recover() != nil {
+				err = fmt.Errorf("take lock fail , lost stream : %s@%s", namespace, key)
+			}
+		}()
+		select {
+		case v.(chan struct{}) <- struct{}{}:
+			log.Debugf("alibp2p-service::KeyMutex-lock:success : %s@%s", namespace, key)
+		case <-t.C:
+			log.Debugf("alibp2p-service::KeyMutex-lock:timeout : %s@%s", namespace, key)
+			err = fmt.Errorf("take lock timeout : %s@%s", namespace, key)
+		}
+		return
+	}
+	return ns_notfound
+}
+
+func (k *KeyMutex) Unlock(namespace, key string) (err error) {
+	_, ok := k.reglock.Load(namespace)
+	if ok {
+		v, ok := k.reglock.Load(k.hash(namespace, key))
+		log.Debugf("alibp2p-service::KeyMutex-unlock:try %s@%s load=%v", namespace, key, ok)
+		if ok {
+			t := time.NewTimer(k.timeout)
+			defer func() {
+				t.Stop()
+				if recover() != nil {
+					err = fmt.Errorf("release lock fail , lost stream : %s@%s", namespace, key)
+				}
+			}()
+			select {
+			case <-v.(chan struct{}):
+				log.Debugf("alibp2p-service::KeyMutex-unlock:success : %s@%s", namespace, key)
+				return nil
+			case <-t.C:
+				log.Debugf("alibp2p-service::KeyMutex-unlock:timeout : %s@%s", namespace, key)
+				return fmt.Errorf("release lock timeout : %s@%s", namespace, key)
+			}
+		}
+		return
+	}
+	return ns_notfound
+}
+
+// 清除一个旧的锁，会释放一批阻塞的还未超时的 lock 请求，
+// 释放以后会在 ns 上产生新的锁,如果 timeout 时间很长，
+// 需要提前解除阻塞，可以使用 clean 方法
+func (k *KeyMutex) Clean(namespace, key string) {
+	if key == "" || namespace == "" {
+		return
+	}
+	if v, ok := k.reglock.Load(k.hash(namespace, key)); ok {
+		k.reglock.Delete(namespace + key)
+		defer func() {
+			if r := recover(); r != nil {
+				// ignoe
+			}
+		}()
+		close(v.(chan struct{}))
+	}
+	log.Debugf("alibp2p-service::KeyMutex-cleanlock : %s@%s", namespace, key)
+}
+
+func (k *KeyMutex) hash(namespace, key string) string {
+	v, ok := k.kcache.Get(namespace + key)
+	if ok {
+		return v.(string)
+	}
+	s1 := sha1.New()
+	s1.Write([]byte(namespace + key))
+	buf := s1.Sum(nil)
+	hash := hex.EncodeToString(buf)
+	k.kcache.Add(namespace+key, hash)
+	return hash
 }
 
 // private funcs

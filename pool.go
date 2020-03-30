@@ -51,9 +51,10 @@ type (
 	SessionKey   string
 	AStreamCache struct {
 		// { aconnkey -> { session -> conn } }
-		pool    map[StreamKey]map[SessionKey]*reuse_stream
-		reg     map[string]StreamHandler
-		reglock *sync.Map
+		pool map[StreamKey]map[SessionKey]*reuse_stream
+		reg  map[string]StreamHandler
+		//reglock  *sync.Map
+		kmutex *KeyMutex
 		//reglock map[string]*sync.Mutex
 		lock   *sync.RWMutex
 		msgc   metrics.Reporter
@@ -107,10 +108,11 @@ func (s StreamKey) Protoid() string { return strings.Split(string(s), "@")[0] }
 
 func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 	return &AStreamCache{
-		pool:    make(map[StreamKey]map[SessionKey]*reuse_stream),
-		lock:    new(sync.RWMutex),
-		reg:     make(map[string]StreamHandler),
-		reglock: new(sync.Map),
+		pool: make(map[StreamKey]map[SessionKey]*reuse_stream),
+		lock: new(sync.RWMutex),
+		reg:  make(map[string]StreamHandler),
+		//reglock: new(sync.Map),
+		kmutex: NewKeyMutex(30 * time.Second),
 		//reglock: make(map[string]*sync.Mutex),
 		msgc:   msgc,
 		expire: def_expire,
@@ -291,8 +293,23 @@ func (p *AStreamCache) regist(pid string, handler StreamHandler) {
 	}
 	p.reg[pid] = handler
 	//p.reglock[pid] = new(sync.Mutex)
-	p.reglock.Store(pid, make(chan struct{}))
+	//p.reglock.Store(pid, make(chan struct{}))
+	p.kmutex.Regist(pid)
 }
+
+func (p *AStreamCache) takelock(id, pid string) error {
+	return p.kmutex.Lock(pid, id)
+}
+
+func (p *AStreamCache) cleanlock(id, pid string) {
+	p.kmutex.Clean(pid, id)
+}
+
+func (p *AStreamCache) unlock(id, pid string) error {
+	return p.kmutex.Unlock(pid, id)
+}
+
+/*
 
 func (p *AStreamCache) takelock(id, pid string) (err error) {
 	_, ok := p.reglock.Load(pid)
@@ -359,35 +376,4 @@ func (p *AStreamCache) unlock(id, pid string) (err error) {
 	return nil
 }
 
-/*
-func (p *AStreamCache) takelock(id, pid string) error {
-	_, ok := p.reglock.Load(pid)
-	if ok {
-		log.Debug("alibp2p-service::AStreamCache-lock:try", pid, id)
-		v, _ := p.reglock.LoadOrStore(pid+id, new(sync.Mutex))
-		v.(*sync.Mutex).Lock()
-		log.Debug("alibp2p-service::AStreamCache-lock:success", pid, id)
-	}
-	return nil
-}
-
-func (p *AStreamCache) cleanlock(id, pid string) {
-	if id == "" || pid == "" {
-		return
-	}
-	p.reglock.Delete(pid + id)
-	log.Debug("alibp2p-service::AStreamCache-cleanlock", pid, id)
-}
-
-func (p *AStreamCache) unlock(id, pid string) error {
-	_, ok := p.reglock.Load(pid)
-	if ok {
-		log.Debug("alibp2p-service::AStreamCache-unlock:try", pid, id)
-		if v, ok := p.reglock.Load(pid + id); ok {
-			v.(*sync.Mutex).Unlock()
-			log.Debug("alibp2p-service::AStreamCache-unlock:success", pid, id)
-		}
-	}
-	return nil
-}
 */
