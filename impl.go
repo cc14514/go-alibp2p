@@ -160,13 +160,11 @@ func NewService(cfg Config) Alibp2pService {
 		return false
 	}
 
-	if cfg.ReuseStream {
-		service.asc = NewAStreamCatch(msgc)
-		service.OnDisconnected(func(sessionId string, pubKey *ecdsa.PublicKey) {
-			id, _ := ECDSAPubEncode(pubKey)
-			service.asc.del2(id, "", "")
-		})
-	}
+	service.asc = NewAStreamCatch(msgc)
+	service.OnDisconnected(func(sessionId string, pubKey *ecdsa.PublicKey) {
+		id, _ := ECDSAPubEncode(pubKey)
+		service.asc.del2(id, "", "")
+	})
 
 	return service
 }
@@ -200,7 +198,7 @@ func (self *Service) Myid() (id string, addrs []string) {
 	return
 }
 
-func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration) {
+func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.checkReuse(pid)
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
 		self.msgc.LogRecvMessage(1)
@@ -214,21 +212,12 @@ func (self *Service) SetHandlerWithTimeout(pid string, handler StreamHandler, re
 		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
 		pk, err := id2pubkey(s.Conn().RemotePeer())
 		if err != nil {
-			log.Debug(err)
+			log.Error(err)
 			return
 		}
 		pubkeyToEcdsa(pk)
-		if readTimeout > 0 {
-			tot := time.Now().Add(readTimeout)
-			s.SetReadDeadline(tot)
-			defer func() {
-				if s != nil {
-					s.SetReadDeadline(notimeout)
-				}
-			}()
-		}
 		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
-			log.Debug(err)
+			log.Error(err)
 		}
 	})
 }
@@ -242,10 +231,6 @@ func (self *Service) checkReuse(pid string) {
 	if self.asc.has(pid) {
 		panic("ReuseStream model just provid : SetHandlerReuseStream(string,ReuseStreamHandler)")
 	}
-}
-
-func (self *Service) SetHandler(pid string, handler StreamHandler) {
-	self.SetHandlerWithTimeout(pid, handler, 0)
 }
 
 func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {

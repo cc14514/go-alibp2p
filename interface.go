@@ -54,7 +54,7 @@ type (
 		ClosePeer(pubkey *ecdsa.PublicKey) error
 		SetBootnode(peer ...string) error
 		SetHandler(pid string, handler StreamHandler)
-		SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration)
+		//SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration)
 		SetHandlerReuseStream(pid string, handler StreamHandler)
 
 		SendMsgAfterClose(to, protocolID string, msg []byte) error

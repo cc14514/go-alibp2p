@@ -37,11 +37,10 @@ type (
 		Homedir                                string
 		Port, ConnLow, ConnHi, BootstrapPeriod uint64
 		Bootnodes                              []string
-		Discover, ReuseStream, Relay           bool
+		Discover, Relay                        bool
 		Networkid, MuxPort                     *big.Int
-
-		PrivKey  *ecdsa.PrivateKey
-		Loglevel int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 NOTICE , 5 DEBUG
+		PrivKey                                *ecdsa.PrivateKey
+		Loglevel                               int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG
 	}
 
 	Service struct {
@@ -58,12 +57,14 @@ type (
 		asc              *AStreamCache
 		nsttl            map[string]time.Duration
 	}
+
 	blankValidator struct{}
 	ConnType       int
 	asyncFn        struct {
 		fn   func(context.Context, []interface{})
 		args []interface{}
 	}
+
 	AsyncRunner struct {
 		sync.Mutex
 		wg                *sync.WaitGroup
