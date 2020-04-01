@@ -342,13 +342,13 @@ func (self *Service) Advertise(ctx context.Context, ns string) {
 // TODO 在 DHT 包里实现 ttl 验证
 // TODO 在 DHT 包里实现 ttl 验证
 // TODO 在 DHT 包里实现 ttl 验证
-func (self *Service) FindProviders(ctx context.Context, ns string) ([]string, error) {
+func (self *Service) FindProviders(ctx context.Context, ns string, limit int) ([]string, error) {
 	var (
 		err error
 		ret = make([]string, 0)
 		aCh <-chan peer.AddrInfo
 	)
-	aCh, err = self.routingDiscovery.FindPeers(ctx, ns)
+	aCh, err = self.routingDiscovery.FindPeers(ctx, ns, discoveryopt.Limit(limit))
 	if err != nil {
 		return nil, err
 	}

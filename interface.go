@@ -91,7 +91,7 @@ type (
 		SetAdvertiseTTL(ns string, ttl time.Duration)
 		Advertise(ctx context.Context, ns string)
 
-		FindProviders(ctx context.Context, ns string) ([]string, error)
+		FindProviders(ctx context.Context, ns string, limit int) ([]string, error)
 		/*
 			{
 			  "alibp2p-counter": {
