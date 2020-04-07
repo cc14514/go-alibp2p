@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	netmux "github.com/cc14514/go-mux-transport"
+	"github.com/ipfs/go-cid"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
@@ -20,12 +21,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
-
 	discovery "github.com/libp2p/go-libp2p-discovery"
+	"math/big"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
+	mh "github.com/multiformats/go-multihash"
 	gologging "github.com/whyrusleeping/go-logging"
 	"golang.org/x/xerrors"
 	"io/ioutil"
@@ -317,6 +319,10 @@ func (self *Service) getAdvertiseTTL(ns string) time.Duration {
 
 func (self *Service) SetAdvertiseTTL(ns string, ttl time.Duration) {
 	self.nsttl[ns] = ttl
+	nsk, _ := nsToCid(ns)
+	nsv := big.NewInt(int64(ttl)).String()
+	os.Setenv(nsk.String(), nsv)
+	log.Info("SetAdvertiseTTL", "ns", ns, "nsk", nsk, "nsv", nsv)
 }
 
 func (self *Service) Advertise(ctx context.Context, ns string) {
@@ -334,8 +340,18 @@ func (self *Service) Advertise(ctx context.Context, ns string) {
 				}
 			...
 	*/
-	self.getAdvertiseTTL(ns)
-	discovery.Advertise(ctx, self.routingDiscovery, ns, discoveryopt.TTL(self.getAdvertiseTTL(ns)*time.Second))
+	ttl := self.getAdvertiseTTL(ns)
+	log.Infof("Advertise-ttl : %v", ttl)
+	discovery.Advertise(ctx, self.routingDiscovery, ns, discoveryopt.TTL(ttl))
+}
+
+func nsToCid(ns string) (cid.Cid, error) {
+	h, err := mh.Sum([]byte(ns), mh.SHA2_256, -1)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return cid.NewCidV1(cid.Raw, h), nil
 }
 
 // TODO 在 DHT 包里实现 ttl 验证
