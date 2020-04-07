@@ -28,7 +28,7 @@ go 1.13
 
 replace github.com/libp2p/go-libp2p-swarm => github.com/cc14514/go-libp2p-swarm v0.0.0-20200118064831-601363b81fc2
 
-replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20200403091008-8c7b67c7ab9d
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20200407041107-3f333432007a
 
 replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.1.1-0.20200316152758-68b578b09374
 
