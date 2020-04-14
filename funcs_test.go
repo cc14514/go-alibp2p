@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"io"
@@ -309,4 +310,12 @@ func TestLock(t *testing.T) {
 	h := km.hash("/premsg/1.0.0", "16Uiu2HAm39zRzVr5JK6P1WCba7ew8L5CBT4r5e3wcZ8V2zQRvWSM")
 	fmt.Println(h)
 
+}
+
+func TestCid(t *testing.T) {
+	fcid, _ := nsToCid("foo")
+	t.Log(fcid.String())
+	t.Log(fcid.Bytes())
+	cc, err := cid.Cast(fcid.Bytes())
+	t.Log(err, cc.String())
 }

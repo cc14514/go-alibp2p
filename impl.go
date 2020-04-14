@@ -354,16 +354,13 @@ func nsToCid(ns string) (cid.Cid, error) {
 	return cid.NewCidV1(cid.Raw, h), nil
 }
 
-// TODO 在 DHT 包里实现 ttl 验证
-// TODO 在 DHT 包里实现 ttl 验证
-// TODO 在 DHT 包里实现 ttl 验证
-// TODO 在 DHT 包里实现 ttl 验证
 func (self *Service) FindProviders(ctx context.Context, ns string, limit int) ([]string, error) {
 	var (
 		err error
 		ret = make([]string, 0)
 		aCh <-chan peer.AddrInfo
 	)
+	// 在 DHT 包里实现 ttl 验证
 	aCh, err = self.routingDiscovery.FindPeers(ctx, ns, discoveryopt.Limit(limit))
 	if err != nil {
 		return nil, err
