@@ -67,7 +67,9 @@ type (
 		OnConnected(ConnType, PreMsg, ConnectEvent)
 		OnDisconnected(DisconnectEvent)
 
-		Table() map[string][]string // map => {id:addrs}
+		Table() map[string][]string       // map => {id:addrs}
+		RoutingTable() ([]peer.ID, error) // find in kbuckets
+
 		Conns() (direct []string, relay []string)
 		Peers() (direct []string, relay map[string][]string, total int)
 		PeersWithDirection() (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int)
@@ -76,6 +78,8 @@ type (
 		GetPeerMeta(id, key string) (interface{}, error)
 
 		GetSession(id string) (session string, inbound bool, err error)
+
+		Addrs(id string) ([]string, error)
 
 		Findpeer(id string) ([]string, error) // return addrs,err
 

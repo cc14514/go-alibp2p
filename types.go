@@ -37,7 +37,7 @@ type (
 		Homedir                                string
 		Port, ConnLow, ConnHi, BootstrapPeriod uint64
 		Bootnodes                              []string
-		Discover, Relay                        bool
+		Discover, Relay, DisableInbound        bool
 		Networkid, MuxPort                     *big.Int
 		PrivKey                                *ecdsa.PrivateKey
 		Loglevel                               int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG

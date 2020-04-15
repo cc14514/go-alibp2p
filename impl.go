@@ -85,6 +85,9 @@ func NewService(cfg Config) Alibp2pService {
 
 	bwc := metrics.NewBandwidthCounter()
 	msgc := metrics.NewBandwidthCounter()
+	if cfg.DisableInbound {
+		DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
+	}
 	optlist := []libp2p.Option{
 		libp2p.BandwidthReporter(bwc),
 		libp2p.NATPortMap(),
@@ -167,6 +170,16 @@ func NewService(cfg Config) Alibp2pService {
 		id, _ := ECDSAPubEncode(pubKey)
 		service.asc.del2(id, "", "")
 	})
+
+	if cfg.DisableInbound {
+		service.OnConnected(CONN_TYPE_ALL, nil, func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, _ []byte) {
+			if inbound {
+				id, _ := ECDSAPubEncode(pubKey)
+				log.Warningf("❌ Plume Reject Inbound : %s , %s", id, sessionId)
+				service.ClosePeer(pubKey)
+			}
+		})
+	}
 
 	return service
 }
@@ -763,6 +776,18 @@ func (self *Service) GetPeerMeta(id, key string) (interface{}, error) {
 	return self.host.Peerstore().Get(p, key)
 }
 
+func (self *Service) Addrs(id string) ([]string, error) {
+	peerid, err := peer.IDB58Decode(id)
+	if err != nil {
+		return nil, err
+	}
+	_addrs := self.host.Peerstore().Addrs(peerid)
+	addrs := make([]string, 0)
+	for _, addr := range _addrs {
+		addrs = append(addrs, addr.String())
+	}
+	return addrs, nil
+}
 func (self *Service) Findpeer(id string) ([]string, error) {
 	pi, err := self.findpeer(id)
 	if err != nil {
@@ -956,4 +981,12 @@ func (self *Service) Report(peerids ...string) []byte {
 		return []byte(fmt.Sprintf(`{"time":"%s",%s}`, now, rs))
 	}
 	return nil
+}
+
+func (self *Service) RoutingTable() ([]peer.ID, error) {
+	dht, ok := self.router.(*dht.IpfsDHT)
+	if !ok {
+		return nil, errors.New("router type error")
+	}
+	return dht.RoutingTable().ListPeers(), nil
 }

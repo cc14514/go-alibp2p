@@ -21,6 +21,7 @@ const logvsn = "200327-1"
 
 const (
 	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
+	ProtocolPlume         protocol.ID = "/pdx/plume/1.0.0" // 当 DisableInbound 时使用这个协议来标记
 	NamespaceDHT                      = "cc14514"
 	defConnLow, defConnHi             = 50, 500
 	PSK_TMP                           = `/key/swarm/psk/1.0.0/
