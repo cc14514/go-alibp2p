@@ -33,14 +33,14 @@ type (
 	SimplePacketHead []byte
 
 	Config struct {
-		Ctx                                    context.Context
-		Homedir                                string
-		Port, ConnLow, ConnHi, BootstrapPeriod uint64
-		Bootnodes                              []string
-		Discover, Relay, DisableInbound        bool
-		Networkid, MuxPort                     *big.Int
-		PrivKey                                *ecdsa.PrivateKey
-		Loglevel                               int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG
+		Ctx                                           context.Context
+		Homedir                                       string
+		Port, ConnLow, ConnHi, BootstrapPeriod        uint64
+		Bootnodes                                     []string
+		Discover, Relay, DisableInbound, EnableMetric bool
+		Networkid, MuxPort                            *big.Int
+		PrivKey                                       *ecdsa.PrivateKey
+		Loglevel                                      int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG
 	}
 
 	Service struct {

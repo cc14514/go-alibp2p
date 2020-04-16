@@ -97,8 +97,9 @@ func NewService(cfg Config) Alibp2pService {
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			if router == nil {
 				dht, err := dht.New(cfg.Ctx, h,
-					opts.Client(false),
+					opts.Client(cfg.DisableInbound),
 					opts.NamespacedValidator(NamespaceDHT, blankValidator{}),
+					opts.Metrics(cfg.EnableMetric),
 					opts.Protocols(DefaultProtocols...))
 				if err != nil {
 					panic(xerrors.Errorf("dht : %w", err))
