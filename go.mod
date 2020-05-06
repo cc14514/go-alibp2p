@@ -28,10 +28,10 @@ require (
 
 go 1.13
 
-replace github.com/libp2p/go-libp2p-swarm => github.com/cc14514/go-libp2p-swarm v0.0.0-20200414101126-ec86bc27c764
+replace github.com/libp2p/go-libp2p-swarm => github.com/cc14514/go-libp2p-swarm v0.0.2
 
-replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20200416072228-916c63fc8591
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.2
 
-replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.1.1-0.20200326021926-1261cef289ec
+replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.2
 
-replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.0-20191111122236-413fc41ad3d7
+replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.2
