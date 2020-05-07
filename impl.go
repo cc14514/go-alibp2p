@@ -7,6 +7,7 @@ import (
 	"fmt"
 	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-ipns"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
@@ -22,13 +23,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	record "github.com/libp2p/go-libp2p-record"
 	"math/big"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	opts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
-	gologging "github.com/whyrusleeping/go-logging"
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"os"
@@ -42,15 +43,13 @@ var log = golog.Logger("alibp2p")
 func NewService(cfg Config) Alibp2pService {
 	switch cfg.Loglevel {
 	case 5:
-		golog.SetAllLoggers(gologging.DEBUG)
+		golog.SetAllLoggers(golog.LevelDebug)
 	case 3, 4:
-		golog.SetAllLoggers(gologging.INFO)
-	case 1, 2:
-		golog.SetAllLoggers(gologging.WARNING)
-	case 0:
-		golog.SetAllLoggers(gologging.CRITICAL)
+		golog.SetAllLoggers(golog.LevelInfo)
+	case 0, 1, 2:
+		golog.SetAllLoggers(golog.LevelWarn)
 	default:
-		golog.SetAllLoggers(gologging.ERROR)
+		golog.SetAllLoggers(golog.LevelError)
 	}
 	log.Debug("alibp2p-service::alibp2p.NewService", cfg)
 
@@ -60,6 +59,7 @@ func NewService(cfg Config) Alibp2pService {
 		priv            crypto.PrivKey
 		bootnodes       []peer.AddrInfo
 		connLow, connHi = cfg.ConnLow, cfg.ConnHi
+		ps              = pstoremem.NewPeerstore()
 	)
 	if connLow == 0 {
 		connLow = defConnLow
@@ -88,7 +88,12 @@ func NewService(cfg Config) Alibp2pService {
 	if cfg.DisableInbound {
 		DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
 	}
+	var mo = dht.ModeAuto
+	if cfg.DisableInbound {
+		mo = dht.ModeClient
+	}
 	optlist := []libp2p.Option{
+		libp2p.Peerstore(ps),
 		libp2p.BandwidthReporter(bwc),
 		libp2p.NATPortMap(),
 		libp2p.ListenAddrs(list...),
@@ -97,10 +102,15 @@ func NewService(cfg Config) Alibp2pService {
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			if router == nil {
 				dht, err := dht.New(cfg.Ctx, h,
-					opts.Client(cfg.DisableInbound),
-					opts.NamespacedValidator(NamespaceDHT, blankValidator{}),
-					opts.Metrics(cfg.EnableMetric),
-					opts.Protocols(DefaultProtocols...))
+					dht.Mode(mo),
+					//opts.Client(cfg.DisableInbound),
+					dht.Validator(record.NamespacedValidator{
+						"pk":   record.PublicKeyValidator{},
+						"ipns": ipns.Validator{KeyBook: ps},
+					}))
+				//dht.NamespacedValidator(NamespaceDHT, blankValidator{}))
+				//opts.Metrics(cfg.EnableMetric),
+				//opts.Protocols(DefaultProtocols...))
 				if err != nil {
 					panic(xerrors.Errorf("dht : %w", err))
 				}
@@ -113,9 +123,9 @@ func NewService(cfg Config) Alibp2pService {
 	optlist = append(optlist, libp2p.EnableAutoRelay())
 	if cfg.Relay {
 		//os.Setenv("alibp2prelay", "enable") // 在这里使用 go-libp2p/p2p/protocol/identify/id.go:225
-		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery, circuit.OptHop))
+		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive, circuit.OptHop))
 	} else {
-		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive, circuit.OptDiscovery))
+		optlist = append(optlist, libp2p.EnableRelay(circuit.OptActive))
 	}
 
 	if p, err := cfg.ProtectorOpt(); err == nil {
@@ -123,12 +133,12 @@ func NewService(cfg Config) Alibp2pService {
 	}
 	optlist = append(optlist, cfg.MuxTransportOption(cfg.Loglevel))
 
-	host, rwc, err := libp2p.New2(cfg.Ctx, optlist...)
+	host, err := libp2p.New(cfg.Ctx, optlist...)
 	if err != nil {
 		panic(err)
 	}
 
-	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
+	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
 		full := addr.Encapsulate(hostAddr)
 		log.Infof("[%d] listen on %v", i, full)
@@ -151,7 +161,6 @@ func NewService(cfg Config) Alibp2pService {
 		bootnodes:        bootnodes,
 		notifiee:         make([]*network.NotifyBundle, 0),
 		bwc:              bwc,
-		rwc:              rwc,
 		msgc:             msgc,
 		nsttl:            make(map[string]time.Duration),
 	}
@@ -317,7 +326,7 @@ func (self *Service) Connect(url string) error {
 	if err != nil {
 		return err
 	}
-	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", peer.IDB58Encode(peerid)))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 	return self.host.Connect(self.ctx, peer.AddrInfo{ID: peerid, Addrs: []ma.Multiaddr{targetAddr}})
 }
@@ -444,7 +453,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			log.Error("alibp2p-service::sendMsg-IDB58Decode-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
-		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+		targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", peer.IDB58Encode(peerid)))
 		targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 		raddr := []ma.Multiaddr{targetAddr}
 		if self.cfg.Relay {
@@ -697,7 +706,7 @@ func (self *Service) GetSession(id string) (session string, inbound bool, err er
 func (self *Service) Conns() (direct []string, relay []string) {
 	direct, relay = make([]string, 0), make([]string, 0)
 	for _, c := range self.host.Network().Conns() {
-		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", c.RemotePeer().Pretty()))
 		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
 		taddr, _ := maddr.MarshalText()
 		if strings.Contains(string(taddr), "p2p-circuit") {
@@ -713,7 +722,7 @@ func (self *Service) PeersWithDirection() (direct []PeerDirection, relay map[Pee
 	direct, relay, total = make([]PeerDirection, 0), make(map[PeerDirection][]PeerDirection), 0
 	rl := make([]PeerDirection, 0)
 	for _, c := range self.host.Network().Conns() {
-		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", c.RemotePeer().Pretty()))
+		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", c.RemotePeer().Pretty()))
 		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
 		taddr, _ := maddr.MarshalText()
 		if strings.Contains(string(taddr), "p2p-circuit") {
@@ -743,19 +752,19 @@ func (self *Service) Peers() (direct []string, relay map[string][]string, total 
 	direct, relay, total = make([]string, 0), make(map[string][]string), 0
 	dl, rl := self.Conns()
 	for _, d := range dl {
-		direct = append(direct, strings.Split(d, "/ipfs/")[1])
+		direct = append(direct, strings.Split(d, "/p2p/")[1])
 		total += 1
 	}
 	for _, r := range rl {
 		arr := strings.Split(r, "/p2p-circuit")
 		f, t := arr[0], arr[1]
 
-		rarr, ok := relay[strings.Split(f, "/ipfs/")[1]]
+		rarr, ok := relay[strings.Split(f, "/p2p/")[1]]
 		if !ok {
 			rarr = make([]string, 0)
 		}
-		rarr = append(rarr, strings.Split(t, "/ipfs/")[1])
-		relay[strings.Split(f, "/ipfs/")[1]] = rarr
+		rarr = append(rarr, strings.Split(t, "/p2p/")[1])
+		relay[strings.Split(f, "/p2p/")[1]] = rarr
 		total += 1
 	}
 	return direct, relay, total
@@ -828,7 +837,12 @@ func (self *Service) BootstrapOnce() error {
 	if err != nil {
 		log.Debug("alibp2p-service::bootstrap-once-conn-error", "err", err)
 	}
+	/* TODO : disable
 	err = self.router.(*dht.IpfsDHT).BootstrapOnce(self.ctx, dht.DefaultBootstrapConfig)
+	if err != nil {
+		log.Debug("alibp2p-service::bootstrap-once-query-error", "err", err)
+	}*/
+	err = self.router.Bootstrap(self.ctx)
 	if err != nil {
 		log.Debug("alibp2p-service::bootstrap-once-query-error", "err", err)
 	}
@@ -871,6 +885,7 @@ func (self *Service) bootstrap() error {
 						err := connectFn(context.Background(), self.host, self.bootnodes)
 						log.Debug("alibp2p-service::connectFn-end", err)
 						if err == nil {
+							// TODO : 新版本 可以重复调用 bootstrap
 							log.Debug("alibp2p-service::bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
 								log.Debug("alibp2p-service::Bootstrap the host")
@@ -949,20 +964,21 @@ func (self *Service) Unprotect(id, tag string) (bool, error) {
 
 func (self *Service) Report(peerids ...string) []byte {
 	now := time.Now().Format("2006-01-02 15:04:05")
-	fn := func(stat, stat2, stat3 metrics.Stats) string {
-		tmp := `{"detail":{"bw":{"total-in":"%d","total-out":"%d","rate-in":"%.2f","rate-out":"%.2f"},"rw":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"},"msg":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"}}}`
+	fn := func(stat, stat3 metrics.Stats) string {
+		tmp := `{"detail":{"bw":{"total-in":"%d","total-out":"%d","rate-in":"%.2f","rate-out":"%.2f"},"msg":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"}}}`
+		//tmp := `{"detail":{"bw":{"total-in":"%d","total-out":"%d","rate-in":"%.2f","rate-out":"%.2f"},"rw":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"},"msg":{"total-in":"%d","total-out":"%d","avg-in":"%.2f","avg-out":"%.2f"}}}`
 		jsonStr := fmt.Sprintf(tmp,
 			stat.TotalIn, stat.TotalOut, stat.RateIn, stat.RateOut,
-			stat2.TotalIn, stat2.TotalOut, stat2.RateIn, stat2.RateOut,
+			//stat2.TotalIn, stat2.TotalOut, stat2.RateIn, stat2.RateOut,
 			stat3.TotalIn, stat3.TotalOut, stat3.RateIn, stat3.RateOut,
 		)
 		return jsonStr
 	}
 	if peerids == nil {
 		stat := self.bwc.GetBandwidthTotals()
-		stat2 := self.rwc.GetBandwidthTotals()
+		//stat2 := self.rwc.GetBandwidthTotals()
 		stat3 := self.msgc.GetBandwidthTotals()
-		s := fn(stat, stat2, stat3)
+		s := fn(stat, stat3)
 		return []byte(fmt.Sprintf(`{"time":"%s",%s`, now, s[1:]))
 	} else {
 		rs := ""
@@ -972,9 +988,9 @@ func (self *Service) Report(peerids ...string) []byte {
 				return []byte(err.Error())
 			}
 			stat := self.bwc.GetBandwidthForPeer(id)
-			stat2 := self.rwc.GetBandwidthForPeer(id)
+			//stat2 := self.rwc.GetBandwidthForPeer(id)
 			stat3 := self.msgc.GetBandwidthForPeer(id)
-			s := fn(stat, stat2, stat3)
+			s := fn(stat, stat3)
 			ps := fmt.Sprintf(`"%s":%s`, peerid, s)
 			rs = rs + ps + ","
 		}

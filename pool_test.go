@@ -19,3 +19,9 @@
  *************************************************************************/
 
 package alibp2p
+
+import "testing"
+
+func TestFoobar(t *testing.T) {
+	t.Log("check compile")
+}

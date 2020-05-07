@@ -7,9 +7,9 @@ import (
 	"fmt"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	mplex "github.com/libp2p/go-libp2p-mplex"
-	apnet "github.com/libp2p/go-libp2p-pnet"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	"io/ioutil"
 	"os"
@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const logvsn = "200416-1"
+const logvsn = "0.0.3-dev"
 
 const (
 	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
@@ -55,11 +55,11 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 		k := s.Sum(nil)
 		key := fmt.Sprintf(PSK_TMP, hex.EncodeToString(k))
 		r := strings.NewReader(key)
-		p, err := apnet.NewProtector(r)
+		psk, err := pnet.DecodeV1PSK(r)
 		if err != nil {
 			return nil, err
 		}
-		return libp2p.PrivateNetwork(p), nil
+		return libp2p.PrivateNetwork(psk), nil
 	}
 	return nil, errors.New("disable psk")
 }

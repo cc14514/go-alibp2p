@@ -53,7 +53,7 @@ type (
 		cfg              Config
 		notifiee         []*network.NotifyBundle
 		isDirectFn       func(id string) bool
-		bwc, rwc, msgc   metrics.Reporter
+		bwc, msgc        metrics.Reporter
 		asc              *AStreamCache
 		nsttl            map[string]time.Duration
 	}

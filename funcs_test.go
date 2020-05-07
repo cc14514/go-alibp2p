@@ -96,7 +96,7 @@ func TestConnectArgs(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", peer.IDB58Encode(peerid)))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 
 	t.Log(peerid)
