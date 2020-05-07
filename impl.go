@@ -88,7 +88,7 @@ func NewService(cfg Config) Alibp2pService {
 	if cfg.DisableInbound {
 		DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
 	}
-	var mo = dht.ModeAuto
+	var mo = dht.ModeServer
 	if cfg.DisableInbound {
 		mo = dht.ModeClient
 	}
