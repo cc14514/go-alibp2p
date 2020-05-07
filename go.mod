@@ -31,7 +31,7 @@ go 1.13
 //replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20200416072228-916c63fc8591
 
 // TODO : test
-replace github.com/libp2p/go-libp2p => /Users/liangc/app/gohome/go-libp2p
+replace github.com/libp2p/go-libp2p => ../go-libp2p
 
 // ok
 replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-0.20200507025847-712c27d4a1ca
