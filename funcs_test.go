@@ -30,6 +30,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multihash"
 	"io"
 	"math/big"
 	"net"
@@ -313,9 +314,18 @@ func TestLock(t *testing.T) {
 }
 
 func TestCid(t *testing.T) {
+
 	fcid, _ := nsToCid("foo")
 	t.Log(fcid.String())
 	t.Log(fcid.Bytes())
 	cc, err := cid.Cast(fcid.Bytes())
 	t.Log(err, cc.String())
+
+	// multihash.Multihash
+	hk := fcid.Hash()
+	t.Log(hk)
+	t.Log([]byte(hk))
+	hk2, err := multihash.Cast([]byte(hk))
+	t.Log(hk2, err)
+	t.Log(hk2.HexString())
 }

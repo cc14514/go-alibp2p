@@ -8,7 +8,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/pnet"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	"io/ioutil"
@@ -17,14 +16,14 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.3-dev"
+const logvsn = "0.0.3-200509-dev"
 
 const (
-	ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
-	ProtocolPlume         protocol.ID = "/pdx/plume/1.0.0" // 当 DisableInbound 时使用这个协议来标记
-	NamespaceDHT                      = "cc14514"
-	defConnLow, defConnHi             = 50, 500
-	PSK_TMP                           = `/key/swarm/psk/1.0.0/
+	//ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
+	//ProtocolPlume         protocol.ID = "/pdx/plume/1.0.0" // 当 DisableInbound 时使用这个协议来标记
+	NamespaceDHT          = "cc14514"
+	defConnLow, defConnHi = 50, 500
+	PSK_TMP               = `/key/swarm/psk/1.0.0/
 /base16/
 %s`
 )
@@ -36,8 +35,8 @@ const (
 )
 
 var (
-	pubkeyCache, _          = lru.New(10000)
-	DefaultProtocols        = []protocol.ID{ProtocolDHT}
+	pubkeyCache, _ = lru.New(10000)
+	//DefaultProtocols        = []protocol.ID{ProtocolDHT}
 	loopboot, loopbootstrap int32
 	//defReadTimeout          = 25 * time.Second
 	//defWriteTimeout         = 15 * time.Second
@@ -65,7 +64,6 @@ func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
 }
 
 /*
-
 // DefaultConfig is used to return a default configuration
 func DefaultConfig() *Config {
 	return &Config{

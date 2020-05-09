@@ -7,7 +7,6 @@ import (
 	"fmt"
 	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-ipns"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
@@ -23,15 +22,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	record "github.com/libp2p/go-libp2p-record"
-	"math/big"
-
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -85,12 +82,10 @@ func NewService(cfg Config) Alibp2pService {
 
 	bwc := metrics.NewBandwidthCounter()
 	msgc := metrics.NewBandwidthCounter()
-	if cfg.DisableInbound {
-		DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
-	}
 	var mo = dht.ModeServer
 	if cfg.DisableInbound {
 		mo = dht.ModeClient
+		//DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
 	}
 	optlist := []libp2p.Option{
 		libp2p.Peerstore(ps),
@@ -102,14 +97,18 @@ func NewService(cfg Config) Alibp2pService {
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			if router == nil {
 				dht, err := dht.New(cfg.Ctx, h,
+					dht.Metrics(cfg.EnableMetric),
 					dht.Mode(mo),
-					//opts.Client(cfg.DisableInbound),
-					dht.Validator(record.NamespacedValidator{
-						"pk":   record.PublicKeyValidator{},
-						"ipns": ipns.Validator{KeyBook: ps},
-					}))
+					/*
+						dht.Validator(record.NamespacedValidator{
+							"pk":   record.PublicKeyValidator{},
+							"ipns": ipns.Validator{KeyBook: ps},
+						}),
+					*/
+					dht.ProtocolPrefix(protocol.ID("alibp2p")),
+					dht.NamespacedValidator(NamespaceDHT, blankValidator{}),
+				)
 				//dht.NamespacedValidator(NamespaceDHT, blankValidator{}))
-				//opts.Metrics(cfg.EnableMetric),
 				//opts.Protocols(DefaultProtocols...))
 				if err != nil {
 					panic(xerrors.Errorf("dht : %w", err))
@@ -344,7 +343,8 @@ func (self *Service) SetAdvertiseTTL(ns string, ttl time.Duration) {
 	self.nsttl[ns] = ttl
 	nsk, _ := nsToCid(ns)
 	nsv := big.NewInt(int64(ttl)).String()
-	os.Setenv(nsk.String(), nsv)
+	hk, _ := mh.Cast(nsk.Hash())
+	os.Setenv(hk.String(), nsv)
 	log.Info("SetAdvertiseTTL", "ns", ns, "nsk", nsk, "nsv", nsv)
 }
 
@@ -388,7 +388,7 @@ func (self *Service) FindProviders(ctx context.Context, ns string, limit int) ([
 	if err != nil {
 		return nil, err
 	}
-	err = errors.New("may be timeout")
+	err = errors.New("notfound")
 	for a := range aCh {
 		if err != nil {
 			err = nil

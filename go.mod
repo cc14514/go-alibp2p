@@ -6,6 +6,7 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.0.5
+	github.com/ipfs/go-ipns v0.0.2
 	github.com/ipfs/go-log v1.0.4
 	github.com/libp2p/go-buffer-pool v0.0.2
 	github.com/libp2p/go-libp2p v0.8.3
@@ -15,6 +16,8 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.4.0
 	github.com/libp2p/go-libp2p-kad-dht v0.7.11
 	github.com/libp2p/go-libp2p-mplex v0.2.3
+	github.com/libp2p/go-libp2p-peerstore v0.2.3
+	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/libp2p/go-libp2p-yamux v0.2.7
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multihash v0.0.13
@@ -24,14 +27,10 @@ require (
 
 go 1.13
 
-// TODO
-//replace github.com/libp2p/go-libp2p-swarm => github.com/cc14514/go-libp2p-swarm v0.0.0-20200414101126-ec86bc27c764
+replace github.com/libp2p/go-libp2p-discovery => github.com/cc14514/go-libp2p-discovery v0.0.0-20200509061928-ab91365d125c
 
-// TODO
-//replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.0-20200416072228-916c63fc8591
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.3-rc0
 
-// TODO : test
-replace github.com/libp2p/go-libp2p => ../go-libp2p
+replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.3-rc0
 
-// ok
-replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-0.20200507025847-712c27d4a1ca
+replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-rc0

@@ -153,6 +153,9 @@ func (o PeerDirection) Direction() network.Direction {
 }
 
 func (o PeerDirection) Pretty() string {
+	if strings.Contains(o.ID(), "/p2p/") {
+		return strings.Split(o.ID(), "/p2p/")[1]
+	}
 	if strings.Contains(o.ID(), "ipfs") {
 		return strings.Split(o.ID(), "ipfs/")[1]
 	}
