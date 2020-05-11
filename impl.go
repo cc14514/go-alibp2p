@@ -425,14 +425,27 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), peerid)
 	}()
 
+	setWriteTimeout := func(s network.Stream, timeout time.Time) {
+		var tot time.Time
+		if timeout != notimeout {
+			tot = timeout
+		} else {
+			tot = time.Now().Add(30 * time.Second)
+		}
+		s.SetWriteDeadline(tot)
+	}
+
 	if self.asc.has(protocolID) {
 		ok, expire := false, false
 		if s, ok, expire = self.asc.get(to, protocolID); ok {
 			var _total int64
 			req := NewRawData(nil, msg)
+			// 强制超时
+			setWriteTimeout(s, timeout)
+			defer s.SetWriteDeadline(notimeout)
 			_total, err = ToWriter(s, req)
 			if err != nil {
-				log.Debugf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
+				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -489,16 +502,14 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		for _, addr := range addrs {
 			_addrs = append(_addrs, addr.String())
 		}
-		log.Error("alibp2p-service::sendMsg-NewStream-error", "err", err.Error(), "id", to, "pid", protocolID, "addrs", _addrs)
+		log.Errorf("alibp2p-service::sendMsg-NewStream-error err=%v , id=%s , pid=%s , addr=%v", err.Error(), to, protocolID, _addrs)
 		//panic(err)
 		return peerid, nil, 0, err
 	}
 
-	if notimeout != timeout {
-		log.Debug("alibp2p-service::sendMsg-setDeadline", "timeout", timeout)
-		s.SetWriteDeadline(timeout)
-		defer s.SetWriteDeadline(notimeout)
-	}
+	log.Debug("alibp2p-service::sendMsg-setDeadline", "timeout", timeout)
+	setWriteTimeout(s, timeout)
+	defer s.SetWriteDeadline(notimeout)
 
 	if self.asc.has(protocolID) {
 		var _total int64
@@ -515,7 +526,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	} else {
 		total, err = s.Write(msg)
 		if err != nil {
-			log.Error("alibp2p-service::sendMsg-reuse-stream-error-3", "err", err, "id", to, "pid", protocolID)
+			log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-3 : err=%v , id=%s , pid=%s", err, to, protocolID)
 		}
 	}
 
@@ -579,21 +590,24 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 			case network.DirOutbound:
 				in = false
 			}
-			// 连出去的，并且 preMsg 有值，就给对方发消息
-			if !in && preMsg != nil {
-				proto, pkg := preMsg()
-				log.Debug("alibp2p-service::OnConnected-send-premsg-start", "id", conn.RemotePeer().Pretty(), "proto", proto, "pkg", pkg)
-				resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 20*time.Second)
-				log.Debug("alibp2p-service::OnConnected-send-premsg-end", "id", conn.RemotePeer().Pretty(), "proto", proto, "resp", resp, "err", err)
-				if err == nil {
-					preRtn = resp
-				} else {
-					preRtn = append(make([]byte, 8), []byte(err.Error())...)
+			go func() {
+				// 连出去的，并且 preMsg 有值，就给对方发消息
+				if !in && preMsg != nil {
+					proto, pkg := preMsg()
+					log.Infof("alibp2p-service::OnConnected-send-premsg-start id=%s , pid=%s , pkg=%v", conn.RemotePeer().Pretty(), proto, pkg)
+					resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 20*time.Second)
+					log.Infof("alibp2p-service::OnConnected-send-premsg-start id=%s , pid=%s , rsp=%v , err=%v", conn.RemotePeer().Pretty(), proto, resp, err)
+					if err == nil {
+						preRtn = resp
+					} else {
+						preRtn = append(make([]byte, 8), []byte(err.Error())...)
+					}
 				}
-			}
-			log.Debug("alibp2p-service::OnConnected-callbackFn-start", "id", conn.RemotePeer().Pretty())
-			callbackFn(in, sid, pubkey, preRtn)
-			log.Debug("alibp2p-service::OnConnected-callbackFn-end", "id", conn.RemotePeer().Pretty())
+				log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
+				callbackFn(in, sid, pubkey, preRtn)
+				log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
+			}()
+
 		},
 	})
 }
