@@ -292,7 +292,7 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 		}
 		if rsp.Err != "" {
 			self.asc.del2(to, protocolID, "")
-			log.Error("alibp2p::SendMsgAfterClose-error-3", "id", id, "protocolID", protocolID, "err", err.Error())
+			log.Error("alibp2p::SendMsgAfterClose-error-3", "id", id, "protocolID", protocolID, "err", rsp.Err)
 			return errors.New(rsp.Err)
 		}
 		if s != nil {
