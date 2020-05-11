@@ -225,6 +225,9 @@ func (self *Service) Myid() (id string, addrs []string) {
 func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.checkReuse(pid)
 	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
+		if handler == nil {
+			return
+		}
 		self.msgc.LogRecvMessage(1)
 		self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
 		defer func() {
@@ -260,6 +263,9 @@ func (self *Service) checkReuse(pid string) {
 func (self *Service) SetStreamHandler(protoid string, handler func(s network.Stream)) {
 	self.checkReuse(protoid)
 	self.host.SetStreamHandler(protocol.ID(protoid), func(a network.Stream) {
+		if handler == nil {
+			return
+		}
 		if a != nil {
 			self.msgc.LogRecvMessage(1)
 			self.msgc.LogRecvMessageStream(1, a.Protocol(), a.Conn().RemotePeer())
@@ -822,6 +828,14 @@ func (self *Service) findpeer(id string) (peer.AddrInfo, error) {
 		return pi, err
 	}
 	return pi, nil
+}
+
+func (self *Service) GetProtocols(id string) ([]string, error) {
+	peerid, err := peer.IDB58Decode(id)
+	if err != nil {
+		return nil, err
+	}
+	return self.host.Peerstore().GetProtocols(peerid)
 }
 
 func (self *Service) Put(k string, v []byte) error {

@@ -20,8 +20,38 @@
 
 package alibp2p
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+	"time"
+)
 
 func TestFoobar(t *testing.T) {
 	t.Log("check compile")
+}
+
+func TChain(c interface{}, v interface{}) bool {
+	cv := reflect.ValueOf(c)
+	fmt.Println(cv.IsNil(), cv.IsValid(), cv.IsZero())
+	defer fmt.Println(cv.IsNil(), cv.IsValid(), cv.IsZero())
+	vv := reflect.ValueOf(v)
+
+	ok := cv.TrySend(vv)
+	fmt.Println("cv", ok)
+	fmt.Println("cv close")
+	return ok
+}
+
+func TestTChan(t *testing.T) {
+	c1 := make(chan int)
+	go func() {
+		n := <-c1
+		fmt.Println("recv:", n)
+	}()
+	<-time.After(1 * time.Second)
+	err := TChain(c1, 10)
+	fmt.Println(err)
+
+	<-time.After(1 * time.Second)
 }

@@ -121,5 +121,7 @@ type (
 			}
 		*/
 		Report(peerid ...string) []byte
+
+		GetProtocols(id string) ([]string, error)
 	}
 )
