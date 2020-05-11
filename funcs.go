@@ -327,7 +327,10 @@ var (
 		return k, nil
 	}
 	randPeers = func(others []peer.AddrInfo, limit int) []peer.AddrInfo {
-		_, randk, _ := crypto.GenerateRSAKeyPair(1024, rand.Reader)
+		_, randk, err := crypto.GenerateRSAKeyPair(1024, rand.Reader)
+		if err != nil || randk == nil {
+			return nil
+		}
 		rnBytes, _ := randk.Bytes()
 		n := new(big.Int).Mod(new(big.Int).SetBytes(rnBytes), big.NewInt(int64(len(others)))).Int64()
 		others = append(others[n:], others[:n]...)
