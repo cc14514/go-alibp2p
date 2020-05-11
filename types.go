@@ -36,7 +36,7 @@ type (
 		Ctx                                           context.Context
 		Homedir                                       string
 		Port, ConnLow, ConnHi, BootstrapPeriod        uint64
-		Bootnodes                                     []string
+		Bootnodes, ClientProtocols                    []string
 		Discover, Relay, DisableInbound, EnableMetric bool
 		Networkid, MuxPort                            *big.Int
 		PrivKey                                       *ecdsa.PrivateKey
@@ -56,6 +56,7 @@ type (
 		bwc, msgc        metrics.Reporter
 		asc              *AStreamCache
 		nsttl            map[string]time.Duration
+		clientProtocols  map[string]struct{}
 	}
 
 	blankValidator struct{}

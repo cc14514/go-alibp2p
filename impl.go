@@ -162,6 +162,13 @@ func NewService(cfg Config) Alibp2pService {
 		bwc:              bwc,
 		msgc:             msgc,
 		nsttl:            make(map[string]time.Duration),
+		clientProtocols:  make(map[string]struct{}),
+	}
+
+	if cfg.ClientProtocols != nil {
+		for _, p := range cfg.ClientProtocols {
+			service.clientProtocols[p] = struct{}{}
+		}
 	}
 
 	service.isDirectFn = func(id string) bool {
@@ -871,11 +878,11 @@ func (self *Service) bootstrap() error {
 	if self.cfg.BootstrapPeriod > period {
 		period = self.cfg.BootstrapPeriod
 	}
-	log.Debug("alibp2p-service::host-addrs", self.host.Addrs())
-	log.Debug("alibp2p-service::host-network-listen", self.host.Network().ListenAddresses())
-	log.Debug("alibp2p-service::host-peerinfo", self.host.Peerstore().PeerInfo(self.host.ID()))
+	log.Infof("alibp2p-service::host-addrs : %v", self.host.Addrs())
+	log.Infof("alibp2p-service::host-network-listen : %v", self.host.Network().ListenAddresses())
+	log.Infof("alibp2p-service::host-peerinfo : %v", self.host.Peerstore().PeerInfo(self.host.ID()))
 	go func() {
-		log.Debug("alibp2p-service::loopboot-start", "period", period)
+		log.Infof("alibp2p-service::loopboot-start : period=%d", period)
 		if atomic.CompareAndSwapInt32(&loopboot, 0, 1) {
 			defer func() {
 				atomic.StoreInt32(&loopboot, 0)
@@ -887,8 +894,8 @@ func (self *Service) bootstrap() error {
 				case <-self.ctx.Done():
 					return
 				case <-timer.C:
-					if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
-						// 在 peerstore 中随机找至多 5 个节点尝试连接
+					//if self.bootnodes != nil && len(self.host.Network().Conns()) < len(self.bootnodes) {
+					if self.bootnodes != nil {
 						var (
 							limit  = 3
 							others = self.peersWithoutBootnodes()
@@ -902,13 +909,13 @@ func (self *Service) bootstrap() error {
 							// TODO : 新版本 可以重复调用 bootstrap
 							log.Debug("alibp2p-service::bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
-								log.Debug("alibp2p-service::Bootstrap the host")
+								log.Info("alibp2p-service::Bootstrap the host")
 								err = self.router.Bootstrap(self.ctx)
 								if err != nil {
-									log.Debug("alibp2p-service::bootstrap-error", "err", err)
+									log.Infof("alibp2p-service::bootstrap-error : %v", err)
 								}
 							} else {
-								log.Debug("alibp2p-service::Reconnected and bootstrap the host once")
+								log.Info("alibp2p-service::Reconnected and bootstrap the host once")
 								self.BootstrapOnce()
 							}
 						} else if total > 0 {
@@ -917,14 +924,14 @@ func (self *Service) bootstrap() error {
 							}
 							tasks := randPeers(others, limit)
 							err := connectFn(context.Background(), self.host, tasks)
-							log.Debug("alibp2p-service::bootstrap fail try to conn others -->", "err", err, "total", total, "limit", limit, "tasks", tasks)
+							log.Infof("alibp2p-service::bootstrap fail try to conn others --> err=%v , total=%d , limit=%d , tasks=%v", err, total, limit, tasks)
 						}
 					}
 				}
 				timer.Reset(time.Duration(period) * time.Second)
 			}
 		}
-		log.Debug("alibp2p-service::loopboot-end")
+		log.Info("alibp2p-service::loopboot-end")
 	}()
 	return nil
 }
@@ -945,6 +952,16 @@ func (self *Service) peersWithoutBootnodes() []peer.AddrInfo {
 		if p.Pretty() == self.host.ID().Pretty() {
 			continue
 		}
+
+		// 同时也要 exclude 掉 dht.client
+		if protols, err := self.GetProtocols(p.Pretty()); err == nil {
+			for _, p := range protols {
+				if _, ok := self.clientProtocols[p]; ok {
+					continue
+				}
+			}
+		}
+
 		if pi := self.host.Peerstore().PeerInfo(p); pi.Addrs != nil && len(pi.Addrs) > 0 {
 			result = append(result, pi)
 		}
