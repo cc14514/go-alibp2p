@@ -48,6 +48,12 @@ func NewService(cfg Config) Alibp2pService {
 	default:
 		golog.SetAllLoggers(golog.LevelError)
 	}
+	// TODO : just for debug
+	// TODO : just for debug
+	// TODO : just for debug
+	// TODO : just for debug
+	// TODO : just for debug
+	golog.SetAllLoggers(golog.LevelDebug)
 	log.Debug("alibp2p-service::alibp2p.NewService", cfg)
 
 	var (
@@ -425,15 +431,13 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), peerid)
 	}()
 
-	setWriteTimeout := func(s network.Stream, timeout time.Time) {
-		var tot time.Time
+	/*	setWriteTimeout := func(s network.Stream, timeout time.Time) {
+		var tot = notimeout
 		if timeout != notimeout {
 			tot = timeout
-		} else {
-			tot = time.Now().Add(30 * time.Second)
 		}
 		s.SetWriteDeadline(tot)
-	}
+	}*/
 
 	if self.asc.has(protocolID) {
 		ok, expire := false, false
@@ -444,13 +448,14 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			//defer s.SetWriteDeadline(notimeout)
 			_total, err2 := ToWriter(s, req)
 			if err2 != nil {
+				err = err2
 				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err2)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
 				log.Debugf("alibp2p-service::sendMsg-reuse-stream-1 to=%s@%s msgid=%d msgsize=%d", protocolID, to, req.ID(), req.Len())
-				return
 			}
+			return
 		} else if expire {
 			log.Info("alibp2p-service::sendMsg-gc-expire-stream", "id", to, "pid", protocolID)
 			self.asc.del(s)
@@ -507,9 +512,11 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		return peerid, nil, 0, err
 	}
 
+	if timeout != notimeout {
+		s.SetWriteDeadline(timeout)
+		defer s.SetWriteDeadline(notimeout)
+	}
 	log.Infof("alibp2p-service::sendMsg-NewStream-end::sendMsg-setDeadline id=%s , timeout=%v", to, timeout)
-	setWriteTimeout(s, timeout)
-	defer s.SetWriteDeadline(notimeout)
 
 	if self.asc.has(protocolID) {
 		var _total int64
@@ -678,13 +685,14 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 				c.RemotePeer()
 			}
 			sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-			for _, s := range conn.GetStreams() {
-				if self.asc.has(string(s.Protocol())) {
-					log.Infof("alibp2p::OnDisconnected::clean-stream-cache id=%s , protocolID=%s", conn.RemotePeer().Pretty(), s.Protocol())
-					self.asc.del(s)
+			/*
+				for _, s := range conn.GetStreams() {
+					if self.asc.has(string(s.Protocol())) {
+						log.Infof("alibp2p::OnDisconnected::clean-stream-cache id=%s , protocolID=%s", conn.RemotePeer().Pretty(), s.Protocol())
+						self.asc.del(s)
+					}
 				}
-			}
-
+			*/
 			callback(sid, pubkeyToEcdsa(pk))
 		},
 	})

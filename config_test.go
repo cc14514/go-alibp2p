@@ -80,3 +80,7 @@ func TestCmp(t *testing.T) {
 	m := map[interface{}]interface{}{1: 1, 2: 2, 3: 3}
 	t.Log(len(m))
 }
+
+func TestNotimeout(t *testing.T) {
+	t.Log(notimeout == notimeout, notimeout)
+}

@@ -42,7 +42,8 @@ var (
 	//defWriteTimeout         = 15 * time.Second
 	notimeout = time.Time{}
 	//def_maxsize  int64 = 512
-	def_maxsize int64 = 13 * 1024 * 1024
+	def_maxsize int64 = 50 * 1024 * 1024 // TODO just for debug
+	//def_maxsize int64 = 13 * 1024 * 1024
 	//_maxsize  int64 = 13 * 1024 * 1024
 	def_nsttl = time.Duration(86400) // 1hour
 )
@@ -78,6 +79,23 @@ func DefaultConfig() *Config {
 		WriteCoalesceDelay:     100 * time.Microsecond,
 	}
 }
+
+
+// DefaultConfig is used to return a default configuration
+func DefaultConfig() *Config {
+	return &Config{
+		AcceptBacklog:          256,
+		EnableKeepAlive:        true,
+		KeepAliveInterval:      30 * time.Second,
+		ConnectionWriteTimeout: 10 * time.Second,
+		MaxStreamWindowSize:    initialStreamWindow,
+		LogOutput:              os.Stderr,
+		ReadBufSize:            4096,
+		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
+		WriteCoalesceDelay:     100 * time.Microsecond,
+	}
+}
+
 */
 func (cfg Config) MuxTransportOption(loglevel int) libp2p.Option {
 	ymxtpt := &yamux.Transport{

@@ -2,7 +2,7 @@ module github.com/cc14514/go-alibp2p
 
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
-	github.com/cc14514/go-mux-transport v0.0.3-0.20200507033647-f8474a56dffe
+	github.com/cc14514/go-mux-transport v0.0.3-rc0
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.0.5
@@ -31,6 +31,6 @@ replace github.com/libp2p/go-libp2p-discovery => github.com/cc14514/go-libp2p-di
 
 replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.3-rc0
 
-replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.3-rc0
+replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.3-rc1
 
 replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-rc0

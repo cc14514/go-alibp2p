@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-const def_expire = 60 // 10sec for debug
+const def_expire = 30 * 60 // 10sec for debug
 
 type (
 	reuse_conn struct {
