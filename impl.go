@@ -494,6 +494,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
 	}
 
+	log.Infof("alibp2p-service::newstream-start::sendMsg-setDeadline id=%s", to)
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
 	if err != nil {
 		addrs := self.host.Peerstore().Addrs(peerid)
@@ -506,7 +507,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		return peerid, nil, 0, err
 	}
 
-	log.Debug("alibp2p-service::sendMsg-setDeadline", "timeout", timeout)
+	log.Infof("alibp2p-service::newstream-ok::sendMsg-setDeadline id=%s , timeout=%v", to, timeout)
 	setWriteTimeout(s, timeout)
 	defer s.SetWriteDeadline(notimeout)
 
@@ -595,7 +596,7 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 					proto, pkg := preMsg()
 					log.Infof("alibp2p-service::OnConnected-send-premsg-start id=%s , pid=%s , pkg=%v", conn.RemotePeer().Pretty(), proto, pkg)
 					resp, err := self.RequestWithTimeout(conn.RemotePeer().Pretty(), proto, pkg, 20*time.Second)
-					log.Infof("alibp2p-service::OnConnected-send-premsg-start id=%s , pid=%s , rsp=%v , err=%v", conn.RemotePeer().Pretty(), proto, resp, err)
+					log.Infof("alibp2p-service::OnConnected-send-premsg-end id=%s , pid=%s , rsp=%v , err=%v", conn.RemotePeer().Pretty(), proto, resp, err)
 					if err == nil {
 						preRtn = resp
 					} else {
@@ -613,12 +614,12 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
 	if self.asc.has(proto) {
-		log.Debug("alibp2p::RequestWithTimeout-lock:try", "id", to, "protocolID", proto)
+		log.Infof("alibp2p::RequestWithTimeout-lock:try id=%s , protocolID=%s", to, proto)
 		if err := self.asc.takelock(to, proto); err != nil {
-			log.Error("alibp2p::RequestWithTimeout-lock:fail", "id", to, "protocolID", proto, "err", err.Error())
+			log.Errorf("alibp2p::RequestWithTimeout-lock:fail id=%s , protocolID=%s , err=%s", to, proto, err.Error())
 			return nil, err
 		}
-		log.Debug("alibp2p::RequestWithTimeout-lock:success", "id", to, "protocolID", proto)
+		log.Infof("alibp2p::RequestWithTimeout-lock:success id=%s , protocolID=%s", to, proto)
 		defer self.asc.unlock(to, proto)
 	}
 	var buf []byte
