@@ -444,7 +444,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			defer s.SetWriteDeadline(notimeout)
 			_total, err2 := ToWriter(s, req)
 			if err2 != nil {
-				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
+				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err2)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
@@ -589,7 +589,7 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 			case network.DirOutbound:
 				in = false
 			}
-			go func() {
+			func() {
 				// 连出去的，并且 preMsg 有值，就给对方发消息
 				if !in && preMsg != nil {
 					proto, pkg := preMsg()
