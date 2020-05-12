@@ -310,7 +310,8 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	} else {
 		// reuse channel
 		rsp := new(RawData)
-		s.SetReadDeadline(time.Now().Add(3 * time.Second))
+		// TODO
+		//s.SetReadDeadline(time.Now().Add(30 * time.Second))
 		_, err := FromReader(s, rsp)
 		if err != nil {
 			log.Errorf("alibp2p::SendMsgAfterClose-error-2 id=%s , protocolID=%s , err=%v", id, protocolID, err.Error())
