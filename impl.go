@@ -295,7 +295,7 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 	id, s, _, err := self.sendMsg(to, protocolID, msg, notimeout)
 	//self.host.ConnManager().Protect(id, "tmp")
 	if err != nil {
-		log.Error("alibp2p::SendMsgAfterClose-error-1", "id", id, "protocolID", protocolID, "err", err.Error())
+		log.Errorf("alibp2p::SendMsgAfterClose-error-1 id=%s , protocolID=%s , err=%v", id, protocolID, err.Error())
 		//self.host.Network().ClosePeer(id)
 		return err
 	}
@@ -307,13 +307,13 @@ func (self *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error 
 		s.SetReadDeadline(time.Now().Add(3 * time.Second))
 		_, err := FromReader(s, rsp)
 		if err != nil {
-			log.Error("alibp2p::SendMsgAfterClose-error-2", "id", id, "protocolID", protocolID, "err", err.Error())
+			log.Errorf("alibp2p::SendMsgAfterClose-error-2 id=%s , protocolID=%s , err=%v", id, protocolID, err.Error())
 			self.asc.del2(to, protocolID, "")
 			return err
 		}
 		if rsp.Err != "" {
 			self.asc.del2(to, protocolID, "")
-			log.Error("alibp2p::SendMsgAfterClose-error-3", "id", id, "protocolID", protocolID, "err", rsp.Err)
+			log.Errorf("alibp2p::SendMsgAfterClose-error-3 id=%s , protocolID=%s , err=%v", id, protocolID, rsp.Err)
 			return errors.New(rsp.Err)
 		}
 		if s != nil {
@@ -438,20 +438,19 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 	if self.asc.has(protocolID) {
 		ok, expire := false, false
 		if s, ok, expire = self.asc.get(to, protocolID); ok {
-			var _total int64
 			req := NewRawData(nil, msg)
 			// 强制超时
 			setWriteTimeout(s, timeout)
 			defer s.SetWriteDeadline(notimeout)
-			_total, err = ToWriter(s, req)
-			if err != nil {
+			_total, err2 := ToWriter(s, req)
+			if err2 != nil {
 				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err)
 				self.asc.del2(to, protocolID, "")
 			} else {
 				total = int(_total)
 				log.Debugf("alibp2p-service::sendMsg-reuse-stream-1 to=%s@%s msgid=%d msgsize=%d", protocolID, to, req.ID(), req.Len())
+				return
 			}
-			return
 		} else if expire {
 			log.Info("alibp2p-service::sendMsg-gc-expire-stream", "id", to, "pid", protocolID)
 			self.asc.del(s)

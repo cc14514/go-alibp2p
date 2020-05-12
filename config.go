@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.3-20051104-dev"
+const logvsn = "0.0.3-20051201-dev"
 
 const (
 	//ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
