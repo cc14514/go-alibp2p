@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-const def_expire = 3600 // 10sec for debug
+const def_expire = 60 // 10sec for debug
 
 type (
 	reuse_conn struct {
@@ -128,7 +128,7 @@ func (p *AStreamCache) del2(to, protoid string, session SessionKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.cleanlock(to, protoid)
-	log.Debug("alibp2p-service::AStreamCache-del2.input", to, protoid, session, len(p.pool))
+	log.Infof("alibp2p-service::AStreamCache-del2.input : id=%s , protocolID=%s , session=%s , poolsize=%d", to, protoid, session, len(p.pool))
 	if protoid == "" {
 		// 1: protoid == nil 删除全部包含 to 的 key, 不会很多，遍历即可
 		for streamkey, sm := range p.pool {

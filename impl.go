@@ -440,8 +440,8 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		if s, ok, expire = self.asc.get(to, protocolID); ok {
 			req := NewRawData(nil, msg)
 			// 强制超时
-			setWriteTimeout(s, timeout)
-			defer s.SetWriteDeadline(notimeout)
+			//setWriteTimeout(s, timeout)
+			//defer s.SetWriteDeadline(notimeout)
 			_total, err2 := ToWriter(s, req)
 			if err2 != nil {
 				log.Errorf("alibp2p-service::sendMsg-reuse-stream-error-1 to=%s@%s msgid=%d msgsize=%d err=%v", protocolID, to, req.ID(), req.Len(), err2)
@@ -494,7 +494,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.host.Peerstore().AddAddrs(peerid, raddr, peerstore.TempAddrTTL)
 	}
 
-	log.Infof("alibp2p-service::newstream-start::sendMsg-setDeadline id=%s", to)
+	log.Infof("alibp2p-service::sendMsg-NewStream-start::sendMsg-setDeadline id=%s", to)
 	s, err = self.host.NewStream(context.Background(), peerid, protocol.ID(protocolID))
 	if err != nil {
 		addrs := self.host.Peerstore().Addrs(peerid)
@@ -507,7 +507,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		return peerid, nil, 0, err
 	}
 
-	log.Infof("alibp2p-service::newstream-ok::sendMsg-setDeadline id=%s , timeout=%v", to, timeout)
+	log.Infof("alibp2p-service::sendMsg-NewStream-end::sendMsg-setDeadline id=%s , timeout=%v", to, timeout)
 	setWriteTimeout(s, timeout)
 	defer s.SetWriteDeadline(notimeout)
 
@@ -678,6 +678,13 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 				c.RemotePeer()
 			}
 			sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+			for _, s := range conn.GetStreams() {
+				if self.asc.has(string(s.Protocol())) {
+					log.Infof("alibp2p::OnDisconnected::clean-stream-cache id=%s , protocolID=%s", conn.RemotePeer().Pretty(), s.Protocol())
+					self.asc.del(s)
+				}
+			}
+
 			callback(sid, pubkeyToEcdsa(pk))
 		},
 	})
