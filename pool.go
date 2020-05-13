@@ -112,7 +112,7 @@ func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 		lock: new(sync.RWMutex),
 		reg:  make(map[string]StreamHandler),
 		//reglock: new(sync.Map),
-		kmutex: NewKeyMutex(30 * time.Second),
+		kmutex: NewKeyMutex(45 * time.Second),
 		//reglock: make(map[string]*sync.Mutex),
 		msgc:   msgc,
 		expire: def_expire,
