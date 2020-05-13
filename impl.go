@@ -623,6 +623,42 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 	})
 }
 
+func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
+	self.notifiee = append(self.notifiee, &network.NotifyBundle{
+		ConnectedF: func(i network.Network, conn network.Conn) {
+			switch t {
+			case CONNT_TYPE_DIRECT:
+				if !self.isDirectFn(conn.RemotePeer().Pretty()) {
+					return
+				}
+			case CONN_TYPE_RELAY:
+				if self.isDirectFn(conn.RemotePeer().Pretty()) {
+					return
+				}
+			case CONN_TYPE_ALL:
+			}
+			var (
+				in     bool
+				pk, _  = id2pubkey(conn.RemotePeer())
+				sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+				pubkey = pubkeyToEcdsa(pk)
+			)
+			switch conn.Stat().Direction {
+			case network.DirInbound:
+				in = true
+			case network.DirOutbound:
+				in = false
+			}
+			func() {
+				log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
+				callbackFn(in, sid, pubkey)
+				log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
+			}()
+
+		},
+	})
+}
+
 func (self *Service) RequestWithTimeout(to, proto string, pkg []byte, timeout time.Duration) ([]byte, error) {
 	if self.asc.has(proto) {
 		log.Infof("alibp2p::RequestWithTimeout-lock:try id=%s , protocolID=%s", to, proto)

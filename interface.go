@@ -37,6 +37,7 @@ type (
 	//ReuseStreamHandler func(ctx context.Context, sessionId string, pubkey *ecdsa.PublicKey, r ReuseStreamReader, w ReuseStreamWriter) error
 
 	PreMsg          func() (string, []byte)
+	ConnectEventFn  func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)
 	ConnectEvent    func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, preRtn []byte)
 	DisconnectEvent func(sessionId string, pubKey *ecdsa.PublicKey)
 
@@ -65,6 +66,7 @@ type (
 		PreConnect(pubkey *ecdsa.PublicKey) error
 
 		OnConnected(ConnType, PreMsg, ConnectEvent)
+		OnConnectedEvent(ConnType, ConnectEventFn)
 		OnDisconnected(DisconnectEvent)
 
 		Table() map[string][]string       // map => {id:addrs}
