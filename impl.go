@@ -26,7 +26,6 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
-	"golang.org/x/xerrors"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -36,6 +35,15 @@ import (
 )
 
 var log = golog.Logger("alibp2p")
+
+func New(opts ...Option) (Alibp2pService, error) {
+	opts = append(opts, FallbackDefaults)
+	var cfg Config
+	if err := cfg.Apply(opts...); err != nil {
+		return nil, err
+	}
+	return NewService(cfg), nil
+}
 
 func NewService(cfg Config) Alibp2pService {
 	switch cfg.Loglevel {
@@ -48,12 +56,6 @@ func NewService(cfg Config) Alibp2pService {
 	default:
 		golog.SetAllLoggers(golog.LevelError)
 	}
-	// TODO : just for debug
-	// TODO : just for debug
-	// TODO : just for debug
-	// TODO : just for debug
-	// TODO : just for debug
-	golog.SetAllLoggers(golog.LevelDebug)
 	log.Debug("alibp2p-service::alibp2p.NewService", cfg)
 
 	var (
@@ -64,6 +66,9 @@ func NewService(cfg Config) Alibp2pService {
 		connLow, connHi = cfg.ConnLow, cfg.ConnHi
 		ps              = pstoremem.NewPeerstore()
 	)
+	if cfg.MaxMsgSize > 1024*1024 {
+		def_maxsize = cfg.MaxMsgSize
+	}
 	if connLow == 0 {
 		connLow = defConnLow
 	}
@@ -80,7 +85,7 @@ func NewService(cfg Config) Alibp2pService {
 	list := make([]ma.Multiaddr, 0)
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
 	list = append(list, listen0)
-	if cfg.MuxPort != nil {
+	if cfg.MuxPort != nil && cfg.MuxPort.Int64() > 0 {
 		listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/%d:%d", cfg.MuxPort, cfg.Port))
 		list = append(list, listen1)
 		netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
@@ -111,13 +116,11 @@ func NewService(cfg Config) Alibp2pService {
 							"ipns": ipns.Validator{KeyBook: ps},
 						}),
 					*/
-					dht.ProtocolPrefix(protocol.ID("alibp2p")),
+					dht.ProtocolPrefix("alibp2p"),
 					dht.NamespacedValidator(NamespaceDHT, blankValidator{}),
 				)
-				//dht.NamespacedValidator(NamespaceDHT, blankValidator{}))
-				//opts.Protocols(DefaultProtocols...))
 				if err != nil {
-					panic(xerrors.Errorf("dht : %w", err))
+					panic(fmt.Errorf("dht : %v", err))
 				}
 				router = dht
 			}
@@ -197,7 +200,7 @@ func NewService(cfg Config) Alibp2pService {
 		service.OnConnected(CONN_TYPE_ALL, nil, func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, _ []byte) {
 			if inbound {
 				id, _ := ECDSAPubEncode(pubKey)
-				log.Warningf("❌ Plume Reject Inbound : %s , %s", id, sessionId)
+				log.Warnf("Node Reject Inbound : %s , %s", id, sessionId)
 				service.ClosePeer(pubKey)
 			}
 		})
@@ -211,7 +214,7 @@ func (self *Service) ClosePeer(pubkey *ecdsa.PublicKey) error {
 	if err != nil {
 		return err
 	}
-	p, err := peer.IDB58Decode(id)
+	p, err := peer.Decode(id)
 	if err != nil {
 		return err
 	}
@@ -341,7 +344,7 @@ func (self *Service) Connect(url string) error {
 	if err != nil {
 		return err
 	}
-	peerid, err := peer.IDB58Decode(pid)
+	peerid, err := peer.Decode(pid)
 	if err != nil {
 		return err
 	}
@@ -426,7 +429,7 @@ func (self *Service) SendMsg(to, protocolID string, msg []byte) (peer.ID, networ
 }
 
 func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Time) (peerid peer.ID, s network.Stream, total int, err error) {
-	peerid, err = peer.IDB58Decode(to)
+	peerid, err = peer.Decode(to)
 	defer func() {
 		self.msgc.LogSentMessage(1)
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), peerid)
@@ -479,7 +482,7 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 			log.Error("alibp2p-service::sendMsg-ValueForProtocol-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
 		}
-		peerid, err = peer.IDB58Decode(pid)
+		peerid, err = peer.Decode(pid)
 		if err != nil {
 			log.Error("alibp2p-service::sendMsg-IDB58Decode-error", "err", err.Error(), "id", to, "pid", protocolID)
 			return peerid, nil, 0, err
@@ -814,7 +817,7 @@ func (self *Service) Peers() (direct []string, relay map[string][]string, total 
 }
 
 func (self *Service) PutPeerMeta(id, key string, v interface{}) error {
-	p, err := peer.IDB58Decode(id)
+	p, err := peer.Decode(id)
 	if err != nil {
 		return err
 	}
@@ -822,7 +825,7 @@ func (self *Service) PutPeerMeta(id, key string, v interface{}) error {
 }
 
 func (self *Service) GetPeerMeta(id, key string) (interface{}, error) {
-	p, err := peer.IDB58Decode(id)
+	p, err := peer.Decode(id)
 	if err != nil {
 		return nil, err
 	}
@@ -830,7 +833,7 @@ func (self *Service) GetPeerMeta(id, key string) (interface{}, error) {
 }
 
 func (self *Service) Addrs(id string) ([]string, error) {
-	peerid, err := peer.IDB58Decode(id)
+	peerid, err := peer.Decode(id)
 	if err != nil {
 		return nil, err
 	}
@@ -856,7 +859,7 @@ func (self *Service) Findpeer(id string) ([]string, error) {
 }
 
 func (self *Service) findpeer(id string) (peer.AddrInfo, error) {
-	peerid, err := peer.IDB58Decode(id)
+	peerid, err := peer.Decode(id)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
@@ -868,7 +871,7 @@ func (self *Service) findpeer(id string) (peer.AddrInfo, error) {
 }
 
 func (self *Service) GetProtocols(id string) ([]string, error) {
-	peerid, err := peer.IDB58Decode(id)
+	peerid, err := peer.Decode(id)
 	if err != nil {
 		return nil, err
 	}
@@ -1007,7 +1010,7 @@ func (self *Service) Nodekey() *ecdsa.PrivateKey {
 //Protect(id, tag string)
 //Unprotect(id, tag string) bool
 func (self *Service) Protect(id, tag string) error {
-	p, err := peer.IDB58Decode(id)
+	p, err := peer.Decode(id)
 	if err != nil {
 		return err
 	}
@@ -1016,7 +1019,7 @@ func (self *Service) Protect(id, tag string) error {
 }
 
 func (self *Service) Unprotect(id, tag string) (bool, error) {
-	p, err := peer.IDB58Decode(id)
+	p, err := peer.Decode(id)
 	if err != nil {
 		return false, err
 	}
@@ -1044,7 +1047,7 @@ func (self *Service) Report(peerids ...string) []byte {
 	} else {
 		rs := ""
 		for _, peerid := range peerids {
-			id, err := peer.IDB58Decode(peerid)
+			id, err := peer.Decode(peerid)
 			if err != nil {
 				return []byte(err.Error())
 			}

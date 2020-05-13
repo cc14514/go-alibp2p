@@ -3,7 +3,6 @@ package alibp2p
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
 	"github.com/google/uuid"
@@ -32,17 +31,6 @@ type (
 
 	SimplePacketHead []byte
 
-	Config struct {
-		Ctx                                           context.Context
-		Homedir                                       string
-		Port, ConnLow, ConnHi, BootstrapPeriod        uint64
-		Bootnodes, ClientProtocols                    []string
-		Discover, Relay, DisableInbound, EnableMetric bool
-		Networkid, MuxPort                            *big.Int
-		PrivKey                                       *ecdsa.PrivateKey
-		Loglevel                                      int // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG
-	}
-
 	Service struct {
 		ctx              context.Context
 		homedir          string
@@ -60,7 +48,6 @@ type (
 	}
 
 	blankValidator struct{}
-	ConnType       int
 	asyncFn        struct {
 		fn   func(context.Context, []interface{})
 		args []interface{}

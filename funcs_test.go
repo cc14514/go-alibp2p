@@ -93,7 +93,7 @@ func TestConnectArgs(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	peerid, err := peer.IDB58Decode(pid)
+	peerid, err := peer.Decode(pid)
 	if err != nil {
 		t.Error(err)
 	}

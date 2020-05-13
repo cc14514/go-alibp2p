@@ -1,6 +1,8 @@
 package alibp2p
 
 import (
+	"context"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -11,16 +13,15 @@ import (
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"strings"
 	"time"
 )
 
-const logvsn = "0.0.3-20051201-dev"
+const logvsn = "0.0.3-20051301-dev"
 
 const (
-	//ProtocolDHT           protocol.ID = "/pdx/kad/1.0.0"
-	//ProtocolPlume         protocol.ID = "/pdx/plume/1.0.0" // 当 DisableInbound 时使用这个协议来标记
 	NamespaceDHT          = "cc14514"
 	defConnLow, defConnHi = 50, 500
 	PSK_TMP               = `/key/swarm/psk/1.0.0/
@@ -28,11 +29,39 @@ const (
 %s`
 )
 
+type ConnType int
+
 const (
 	CONNT_TYPE_DIRECT ConnType = iota
 	CONN_TYPE_RELAY
 	CONN_TYPE_ALL
 )
+
+type Config struct {
+	Ctx                                           context.Context
+	Homedir                                       string
+	Port, ConnLow, ConnHi, BootstrapPeriod        uint64
+	Bootnodes, ClientProtocols                    []string
+	Discover, Relay, DisableInbound, EnableMetric bool
+	Networkid, MuxPort                            *big.Int
+	PrivKey                                       *ecdsa.PrivateKey
+	Loglevel                                      int   // 3 INFO, 4 DEBUG, 5 TRACE -> 3-4 INFO, 5 DEBUG
+	MaxMsgSize                                    int64 // min size 1MB (1024*1024)
+}
+
+type Option func(cfg *Config) error
+
+func (cfg *Config) Apply(opts ...Option) error {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(cfg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 var (
 	pubkeyCache, _ = lru.New(10000)
@@ -42,7 +71,7 @@ var (
 	//defWriteTimeout         = 15 * time.Second
 	notimeout = time.Time{}
 	//def_maxsize  int64 = 512
-	def_maxsize int64 = 50 * 1024 * 1024 // TODO just for debug
+	def_maxsize int64 = 30 * 1024 * 1024 // TODO just for debug
 	//def_maxsize int64 = 13 * 1024 * 1024
 	//_maxsize  int64 = 13 * 1024 * 1024
 	def_nsttl = time.Duration(86400) // 1hour
@@ -79,23 +108,6 @@ func DefaultConfig() *Config {
 		WriteCoalesceDelay:     100 * time.Microsecond,
 	}
 }
-
-
-// DefaultConfig is used to return a default configuration
-func DefaultConfig() *Config {
-	return &Config{
-		AcceptBacklog:          256,
-		EnableKeepAlive:        true,
-		KeepAliveInterval:      30 * time.Second,
-		ConnectionWriteTimeout: 10 * time.Second,
-		MaxStreamWindowSize:    initialStreamWindow,
-		LogOutput:              os.Stderr,
-		ReadBufSize:            4096,
-		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
-		WriteCoalesceDelay:     100 * time.Microsecond,
-	}
-}
-
 */
 func (cfg Config) MuxTransportOption(loglevel int) libp2p.Option {
 	ymxtpt := &yamux.Transport{

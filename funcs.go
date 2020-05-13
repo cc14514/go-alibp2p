@@ -346,7 +346,7 @@ var (
 		return id.Pretty(), err
 	}
 	ECDSAPubDecode = func(pk string) (*ecdsa.PublicKey, error) {
-		id, err := peer.IDB58Decode(pk)
+		id, err := peer.Decode(pk)
 		if err != nil {
 			return nil, err
 		}
