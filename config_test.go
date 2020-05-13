@@ -84,3 +84,12 @@ func TestCmp(t *testing.T) {
 func TestNotimeout(t *testing.T) {
 	t.Log(notimeout == notimeout, notimeout)
 }
+
+func TestOptions(t *testing.T) {
+	var cfg Config
+	opts := FallbackDefaults
+	err := cfg.Apply(opts)
+	t.Log(err, cfg)
+	o, err := cfg.ProtectorOpt()
+	t.Log(err, o)
+}

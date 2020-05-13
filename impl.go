@@ -36,13 +36,13 @@ import (
 
 var log = golog.Logger("alibp2p")
 
-func New(opts ...Option) (Alibp2pService, error) {
+func New(opts ...Option) (Alibp2pService, Config, error) {
 	opts = append(opts, FallbackDefaults)
 	var cfg Config
 	if err := cfg.Apply(opts...); err != nil {
-		return nil, err
+		return nil, cfg, err
 	}
-	return NewService(cfg), nil
+	return NewService(cfg), cfg, nil
 }
 
 func NewService(cfg Config) Alibp2pService {

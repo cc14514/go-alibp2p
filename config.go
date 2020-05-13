@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.3-20051301-dev"
+const logvsn = "0.0.3-20051302-dev"
 
 const (
 	NamespaceDHT          = "cc14514"
@@ -77,7 +77,7 @@ var (
 	def_nsttl = time.Duration(86400) // 1hour
 )
 
-func (cfg Config) ProtectorOpt() (libp2p.Option, error) {
+func (cfg *Config) ProtectorOpt() (libp2p.Option, error) {
 	if cfg.Networkid != nil {
 		s := sha256.New()
 		s.Write(cfg.Networkid.Bytes())
