@@ -36,8 +36,9 @@ type (
 	//ReuseStreamWriter  func(*RawData) error
 	//ReuseStreamHandler func(ctx context.Context, sessionId string, pubkey *ecdsa.PublicKey, r ReuseStreamReader, w ReuseStreamWriter) error
 
-	PreMsg          func() (string, []byte)
-	ConnectEventFn  func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)
+	PreMsg         func() (string, []byte)
+	ConnectEventFn func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)
+	// Deprecated: Use OnConnectedEvent and ConnectEventFn.
 	ConnectEvent    func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, preRtn []byte)
 	DisconnectEvent func(sessionId string, pubKey *ecdsa.PublicKey)
 
@@ -65,7 +66,9 @@ type (
 
 		PreConnect(pubkey *ecdsa.PublicKey) error
 
+		// Deprecated: Use OnConnectedEvent.
 		OnConnected(ConnType, PreMsg, ConnectEvent)
+
 		OnConnectedEvent(ConnType, ConnectEventFn)
 		OnDisconnected(DisconnectEvent)
 

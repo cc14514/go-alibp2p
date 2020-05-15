@@ -42,10 +42,15 @@ func New(opts ...Option) (Alibp2pService, Config, error) {
 	if err := cfg.Apply(opts...); err != nil {
 		return nil, cfg, err
 	}
-	return NewService(cfg), cfg, nil
+	return newService(cfg), cfg, nil
 }
 
+// Deprecated: Use New.
 func NewService(cfg Config) Alibp2pService {
+	return newService(cfg)
+}
+
+func newService(cfg Config) Alibp2pService {
 	switch cfg.Loglevel {
 	case 5:
 		golog.SetAllLoggers(golog.LevelDebug)
@@ -574,6 +579,7 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 	return nil
 }
 
+// Deprecated: Use OnConnectedEvent.
 func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEvent) {
 	self.notifiee = append(self.notifiee, &network.NotifyBundle{
 		ConnectedF: func(i network.Network, conn network.Conn) {
