@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.4-20052701-dev"
+const logvsn = "0.0.4-20052702-dev"
 
 const (
 	gidProtocol           = "/pdx/gid/1.0.0"

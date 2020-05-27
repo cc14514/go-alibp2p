@@ -647,33 +647,43 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 	self.notifiee = append(self.notifiee, &network.NotifyBundle{
 		ConnectedF: func(n network.Network, conn network.Conn) {
 			go func() {
-				wg := new(sync.WaitGroup)
+				var (
+					wg    = new(sync.WaitGroup)
+					errch = make(chan error, 1)
+				)
 				wg.Add(1)
-				go func() {
-					//TODO : 等待 IdService 的完成
-					mygid, _ := n.Peerstore().Get(conn.LocalPeer(), "Groupid")
-					t := time.NewTimer(100 * time.Millisecond)
+				//等待 IdService 的完成
+				go func(errch chan error) {
+					var (
+						err      error
+						mygid, _ = n.Peerstore().Get(conn.LocalPeer(), "Groupid")
+						t        = time.NewTimer(100 * time.Millisecond)
+					)
 					defer func() {
+						errch <- err
+						close(errch)
 						wg.Done()
 						t.Stop()
 					}()
-					i := 0
-					for {
+					for i := 0; i < 20; i++ {
 						<-t.C
 						gid, err := n.Peerstore().Get(conn.RemotePeer(), "Groupid")
-						fmt.Println("OnConnectedEvent>>", i, conn.RemotePeer().Pretty(), gid)
-						i++
+						log.Infof("OnConnectedEvent-WaitIDService>> %d , gid=%s , id=%s , addrs=%v", i, gid, conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
 						if err != nil {
 							t.Reset(500 * time.Millisecond)
 							continue
 						}
 						if mygid.(string) != gid.(string) {
-							return
+							err = errors.New("IDService-success : different group")
 						}
-						break
+						return
 					}
-				}()
+					err = errors.New("IDService timeout")
+				}(errch)
 				wg.Wait()
+				if err := <-errch; err != nil {
+					log.Warnf("alibp2p-service::OnConnected-ignore : %v : %s %v", err, conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
+				}
 
 				switch t {
 				case CONNT_TYPE_DIRECT:
