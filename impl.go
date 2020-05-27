@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cc14514/go-alibp2p/connmgr"
 	netmux "github.com/cc14514/go-mux-transport"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs/go-cid"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
@@ -188,6 +189,7 @@ func newService(cfg Config) Alibp2pService {
 		nsttl:            make(map[string]time.Duration),
 		clientProtocols:  make(map[string]struct{}),
 	}
+	service.blacklist, _ = lru.New(10000)
 
 	if cfg.ClientProtocols != nil {
 		for _, p := range cfg.ClientProtocols {
@@ -665,6 +667,10 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 						wg.Done()
 						t.Stop()
 					}()
+					if blk, yes := self.blacklist.Get(conn.RemotePeer().Pretty()); yes {
+						err = fmt.Errorf("in blacklist : pre addrs is : %v", blk)
+						return
+					}
 					for i := 0; i < 20; i++ {
 						<-t.C
 						gid, err := n.Peerstore().Get(conn.RemotePeer(), "Groupid")
@@ -682,6 +688,7 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 				}(errch)
 				wg.Wait()
 				if err := <-errch; err != nil {
+					self.blacklist.Add(conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
 					log.Warnf("alibp2p-service::OnConnected-ignore : %v : %s %v", err, conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
 				}
 

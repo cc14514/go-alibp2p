@@ -45,6 +45,7 @@ type (
 		asc              *AStreamCache
 		nsttl            map[string]time.Duration
 		clientProtocols  map[string]struct{}
+		blacklist        *lru.Cache
 	}
 
 	blankValidator struct{}
