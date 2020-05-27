@@ -995,6 +995,10 @@ func (self *Service) conns(world bool) (direct []string, relay []string) {
 
 func (self *Service) excludeWorld(world bool, p string) bool {
 	if !world {
+		a := strings.Split(p, "/p2p/")
+		if len(a) > 0 {
+			p = a[1]
+		}
 		gid, err := self.GetPeerMeta(p, "Groupid")
 		log.Infof("excludeWorld %s gid=%v mygid=%v, err=%v", p, gid, self.cfg.Groupid, err)
 		if err != nil || gid.(string) != self.cfg.Groupid {
