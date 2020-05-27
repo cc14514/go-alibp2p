@@ -5,12 +5,12 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/cc14514/go-alibp2p/connmgr"
 	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/ipfs/go-cid"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
-	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	discoveryopt "github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/helpers"
@@ -30,6 +30,7 @@ import (
 	"math/big"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -70,6 +71,11 @@ func newService(cfg Config) Alibp2pService {
 		bootnodes       []peer.AddrInfo
 		connLow, connHi = cfg.ConnLow, cfg.ConnHi
 		ps              = pstoremem.NewPeerstore()
+		setgid          = func(pub ecdsa.PublicKey) {
+			p, _ := ECDSAPubEncode(&pub)
+			id, _ := peer.Decode(p)
+			ps.Put(id, "Groupid", cfg.Groupid)
+		}
 	)
 	if cfg.MaxMsgSize > 1024*1024 {
 		def_maxsize = cfg.MaxMsgSize
@@ -80,12 +86,15 @@ func newService(cfg Config) Alibp2pService {
 	if connHi == 0 {
 		connHi = defConnHi
 	}
+
 	if cfg.PrivKey != nil {
 		_p := (*crypto.Secp256k1PrivateKey)(cfg.PrivKey)
 		priv = (crypto.PrivKey)(_p)
+		setgid(_p.PublicKey)
 	} else {
 		priv, err = loadid(cfg.Homedir)
 		cfg.PrivKey = (*ecdsa.PrivateKey)((priv).(*crypto.Secp256k1PrivateKey))
+		setgid(cfg.PrivKey.PublicKey)
 	}
 	list := make([]ma.Multiaddr, 0)
 	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
@@ -104,12 +113,13 @@ func newService(cfg Config) Alibp2pService {
 		//DefaultProtocols = append(DefaultProtocols, ProtocolPlume)
 	}
 	optlist := []libp2p.Option{
+		libp2p.Groupid(cfg.Groupid), // add by liangc : for ddht
 		libp2p.Peerstore(ps),
 		libp2p.BandwidthReporter(bwc),
 		libp2p.NATPortMap(),
 		libp2p.ListenAddrs(list...),
 		libp2p.Identity(priv),
-		libp2p.ConnectionManager(connmgr.NewConnManager(int(connLow), int(connHi), time.Second*30)),
+		libp2p.ConnectionManager(connmgr.NewConnManager(int(connLow), int(connHi), time.Second*30, cfg.Groupid, ps)),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			if router == nil {
 				dht, err := dht.New(cfg.Ctx, h,
@@ -202,7 +212,7 @@ func newService(cfg Config) Alibp2pService {
 	})
 
 	if cfg.DisableInbound {
-		service.OnConnected(CONN_TYPE_ALL, nil, func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey, _ []byte) {
+		service.OnConnectedEvent(CONN_TYPE_ALL, func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey) {
 			if inbound {
 				id, _ := ECDSAPubEncode(pubKey)
 				log.Warnf("Node Reject Inbound : %s , %s", id, sessionId)
@@ -555,7 +565,7 @@ func (self *Service) PreConnect(pubkey *ecdsa.PublicKey) error {
 		log.Error("alibp2p-service::PreConnect-error-1", "id", id.Pretty(), "err", err)
 		return err
 	}
-	pi, err := self.findpeer(id.Pretty())
+	pi, err := self.findpeer(id.Pretty(), false)
 	if err != nil {
 		log.Error("alibp2p-service::PreConnect-error-2", "id", id.Pretty(), "err", err)
 		return err
@@ -629,38 +639,71 @@ func (self *Service) OnConnected(t ConnType, preMsg PreMsg, callbackFn ConnectEv
 	})
 }
 
+type GidEntity struct {
+	Groupid string
+}
+
 func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 	self.notifiee = append(self.notifiee, &network.NotifyBundle{
-		ConnectedF: func(i network.Network, conn network.Conn) {
-			switch t {
-			case CONNT_TYPE_DIRECT:
-				if !self.isDirectFn(conn.RemotePeer().Pretty()) {
-					return
-				}
-			case CONN_TYPE_RELAY:
-				if self.isDirectFn(conn.RemotePeer().Pretty()) {
-					return
-				}
-			case CONN_TYPE_ALL:
-			}
-			var (
-				in     bool
-				pk, _  = id2pubkey(conn.RemotePeer())
-				sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-				pubkey = pubkeyToEcdsa(pk)
-			)
-			switch conn.Stat().Direction {
-			case network.DirInbound:
-				in = true
-			case network.DirOutbound:
-				in = false
-			}
-			func() {
-				log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
-				callbackFn(in, sid, pubkey)
-				log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
-			}()
+		ConnectedF: func(n network.Network, conn network.Conn) {
+			go func() {
+				wg := new(sync.WaitGroup)
+				wg.Add(1)
+				go func() {
+					//TODO : 等待 IdService 的完成
+					mygid, _ := n.Peerstore().Get(conn.LocalPeer(), "Groupid")
+					t := time.NewTimer(100 * time.Millisecond)
+					defer func() {
+						wg.Done()
+						t.Stop()
+					}()
+					i := 0
+					for {
+						<-t.C
+						gid, err := n.Peerstore().Get(conn.RemotePeer(), "Groupid")
+						fmt.Println("OnConnectedEvent>>", i, conn.RemotePeer().Pretty(), gid)
+						i++
+						if err != nil {
+							t.Reset(500 * time.Millisecond)
+							continue
+						}
+						if mygid.(string) != gid.(string) {
+							return
+						}
+						break
+					}
+				}()
+				wg.Wait()
 
+				switch t {
+				case CONNT_TYPE_DIRECT:
+					if !self.isDirectFn(conn.RemotePeer().Pretty()) {
+						return
+					}
+				case CONN_TYPE_RELAY:
+					if self.isDirectFn(conn.RemotePeer().Pretty()) {
+						return
+					}
+				case CONN_TYPE_ALL:
+				}
+				var (
+					in     bool
+					pk, _  = id2pubkey(conn.RemotePeer())
+					sid    = fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+					pubkey = pubkeyToEcdsa(pk)
+				)
+				switch conn.Stat().Direction {
+				case network.DirInbound:
+					in = true
+				case network.DirOutbound:
+					in = false
+				}
+				func() {
+					log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
+					callbackFn(in, sid, pubkey)
+					log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
+				}()
+			}()
 		},
 	})
 }
@@ -758,12 +801,87 @@ func (self *Service) Start() {
 		os.Setenv("advertise_"+ns, fmt.Sprintf("%d", ttl))
 		fmt.Println("advertise:", ns, " , ttl:", ttl)
 	}
+	go self.grouplinker()
 	fmt.Println("<<<< alibp2p-service <<<<")
 }
 
-func (self *Service) Table() map[string][]string {
+func (self *Service) grouplinker() {
+	var (
+		ctx      = context.Background()
+		worldctx = func(ctx context.Context) context.Context {
+			ctx = context.WithValue(ctx, "world", "world")
+			return ctx
+		}
+		gkey          = HexSHA1(self.cfg.Groupid)
+		once          = new(sync.Once)
+		tc            = time.NewTimer(5 * time.Second)
+		notEmptyTable = func(world bool) bool {
+			if wps, err := self.RoutingTable(world); err == nil && len(wps) > 0 {
+
+				return true
+			}
+			return false
+		}
+		onTheGroup = func() bool { return notEmptyTable(false) }
+		onTheWorld = func() bool { return notEmptyTable(true) }
+
+		advertiseSelfToWorld = func() {
+			self.SetAdvertiseTTL(gkey, 120*time.Second)
+			self.Advertise(worldctx(ctx), gkey)
+			log.Infof("grouplinker-advertiseSelfToWorld : %s", gkey)
+		}
+
+		tryJoinToGroup = func() error {
+			gproviders, err := self.FindProviders(worldctx(ctx), gkey, 10)
+			log.Infof("grouplinker-tryJoinToGroup-providers : err=%v, providers=%v", err, gproviders)
+			if err != nil {
+				return err
+			}
+			pis := make([]peer.AddrInfo, 0)
+			myid, _ := self.Myid()
+			for _, p := range gproviders {
+				if p == myid {
+					continue
+				}
+				if pi, err := self.findpeer(p, true); err == nil {
+					log.Infof("grouplinker-tryJoinToGroup : %s -> %v", pi.ID.Pretty(), pi.Addrs)
+					pis = append(pis, pi)
+				}
+				if len(pis) > 0 {
+					err = connectFn(context.Background(), self.host, pis)
+					log.Infof("grouplinker-tryJoinToGroup-result : %v", err)
+				}
+			}
+			return nil
+		}
+	)
+	defer tc.Stop()
+	for {
+		select {
+		case <-tc.C:
+			if onTheWorld() {
+				once.Do(advertiseSelfToWorld)
+				if !onTheGroup() {
+					tryJoinToGroup()
+				}
+				// TODO more smart wait
+				tc.Reset(30 * time.Second)
+				continue
+			}
+		case <-self.ctx.Done():
+			return
+		}
+		log.Info("grouplinker normal loop")
+		tc.Reset(5 * time.Second)
+	}
+}
+
+func (self *Service) Table(world bool) map[string][]string {
 	r := make(map[string][]string, 0)
 	for _, p := range self.host.Peerstore().Peers() {
+		if self.excludeWorld(world, p.Pretty()) {
+			continue
+		}
 		a := make([]string, 0)
 		pi := self.host.Peerstore().PeerInfo(p)
 		for _, addr := range pi.Addrs {
@@ -791,25 +909,13 @@ func (self *Service) GetSession(id string) (session string, inbound bool, err er
 	return session, inbound, err
 }
 
-func (self *Service) Conns() (direct []string, relay []string) {
-	direct, relay = make([]string, 0), make([]string, 0)
-	for _, c := range self.host.Network().Conns() {
-		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", c.RemotePeer().Pretty()))
-		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
-		taddr, _ := maddr.MarshalText()
-		if strings.Contains(string(taddr), "p2p-circuit") {
-			relay = append(relay, string(taddr))
-		} else {
-			direct = append(direct, string(taddr))
-		}
-	}
-	return direct, relay
-}
-
-func (self *Service) PeersWithDirection() (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int) {
+func (self *Service) PeersWithDirection(world bool) (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int) {
 	direct, relay, total = make([]PeerDirection, 0), make(map[PeerDirection][]PeerDirection), 0
 	rl := make([]PeerDirection, 0)
 	for _, c := range self.host.Network().Conns() {
+		if self.excludeWorld(world, c.RemotePeer().Pretty()) {
+			continue
+		}
 		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", c.RemotePeer().Pretty()))
 		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
 		taddr, _ := maddr.MarshalText()
@@ -836,14 +942,64 @@ func (self *Service) PeersWithDirection() (direct []PeerDirection, relay map[Pee
 	return direct, relay, total
 }
 
+func (self *Service) WorldPeers() (direct []string, relay map[string][]string, total int) {
+	return self.peers(true)
+}
+
 func (self *Service) Peers() (direct []string, relay map[string][]string, total int) {
+	return self.peers(false)
+}
+
+func (self *Service) Conns() (direct []string, relay []string) {
+	return self.conns(false)
+}
+
+func (self *Service) WorldConns() (direct []string, relay []string) {
+	return self.conns(true)
+}
+
+func (self *Service) conns(world bool) (direct []string, relay []string) {
+	direct, relay = make([]string, 0), make([]string, 0)
+	for _, c := range self.host.Network().Conns() {
+		if self.excludeWorld(world, c.RemotePeer().Pretty()) {
+			continue
+		}
+		remoteaddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", c.RemotePeer().Pretty()))
+		maddr := c.RemoteMultiaddr().Encapsulate(remoteaddr)
+		taddr, _ := maddr.MarshalText()
+		if strings.Contains(string(taddr), "p2p-circuit") {
+			relay = append(relay, string(taddr))
+		} else {
+			direct = append(direct, string(taddr))
+		}
+	}
+	return direct, relay
+}
+
+func (self *Service) excludeWorld(world bool, p string) bool {
+	if !world {
+		gid, err := self.GetPeerMeta(p, "Groupid")
+		if err != nil || gid.(string) != self.cfg.Groupid {
+			return true
+		}
+	}
+	return false
+}
+
+func (self *Service) peers(world bool) (direct []string, relay map[string][]string, total int) {
 	direct, relay, total = make([]string, 0), make(map[string][]string), 0
 	dl, rl := self.Conns()
 	for _, d := range dl {
+		if self.excludeWorld(world, d) {
+			continue
+		}
 		direct = append(direct, strings.Split(d, "/p2p/")[1])
 		total += 1
 	}
 	for _, r := range rl {
+		if self.excludeWorld(world, r) {
+			continue
+		}
 		arr := strings.Split(r, "/p2p-circuit")
 		f, t := arr[0], arr[1]
 
@@ -887,7 +1043,7 @@ func (self *Service) Addrs(id string) ([]string, error) {
 	return addrs, nil
 }
 func (self *Service) Findpeer(id string) ([]string, error) {
-	pi, err := self.findpeer(id)
+	pi, err := self.findpeer(id, false)
 	if err != nil {
 		return nil, err
 	}
@@ -900,7 +1056,7 @@ func (self *Service) Findpeer(id string) ([]string, error) {
 	return addrs, nil
 }
 
-func (self *Service) findpeer(id string) (peer.AddrInfo, error) {
+func (self *Service) findpeer(id string, world bool) (peer.AddrInfo, error) {
 	peerid, err := peer.Decode(id)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -1106,10 +1262,13 @@ func (self *Service) Report(peerids ...string) []byte {
 	return nil
 }
 
-func (self *Service) RoutingTable() ([]peer.ID, error) {
+func (self *Service) RoutingTable(world bool) ([]peer.ID, error) {
 	dht, ok := self.router.(*dht.IpfsDHT)
 	if !ok {
 		return nil, errors.New("router type error")
+	}
+	if world {
+		return dht.WorldRoutingTable().ListPeers(), nil
 	}
 	return dht.RoutingTable().ListPeers(), nil
 }

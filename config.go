@@ -19,9 +19,10 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.3-20051501-dev"
+const logvsn = "0.0.4-20052701-dev"
 
 const (
+	gidProtocol           = "/pdx/gid/1.0.0"
 	NamespaceDHT          = "cc14514"
 	defConnLow, defConnHi = 50, 500
 	PSK_TMP               = `/key/swarm/psk/1.0.0/
@@ -40,6 +41,7 @@ const (
 type Config struct {
 	Ctx                                           context.Context
 	Homedir                                       string
+	Groupid                                       string // for ddht
 	Port, ConnLow, ConnHi, BootstrapPeriod        uint64
 	Bootnodes, ClientProtocols                    []string
 	Discover, Relay, DisableInbound, EnableMetric bool

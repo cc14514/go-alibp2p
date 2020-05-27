@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	mh "github.com/multiformats/go-multihash"
 	"github.com/tendermint/go-amino"
 	"io"
 	"io/ioutil"
@@ -399,5 +400,18 @@ var (
 
 	MustToBytes = func(ptr interface{}) []byte {
 		return amino.MustMarshalBinaryLengthPrefixed(ptr)
+	}
+
+	HexSHA1 = func(data interface{}) string {
+		buf, ok := data.([]byte)
+		if !ok {
+			str, ok := data.(string)
+			if !ok {
+				return ""
+			}
+			buf = []byte(str)
+		}
+		h, _ := mh.Sum(buf, mh.SHA1, -1)
+		return h.HexString()
 	}
 )

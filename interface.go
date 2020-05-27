@@ -72,12 +72,8 @@ type (
 		OnConnectedEvent(ConnType, ConnectEventFn)
 		OnDisconnected(DisconnectEvent)
 
-		Table() map[string][]string       // map => {id:addrs}
-		RoutingTable() ([]peer.ID, error) // find in kbuckets
-
 		Conns() (direct []string, relay []string)
 		Peers() (direct []string, relay map[string][]string, total int)
-		PeersWithDirection() (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int)
 
 		PutPeerMeta(id, key string, v interface{}) error
 		GetPeerMeta(id, key string) (interface{}, error)
@@ -128,5 +124,12 @@ type (
 		Report(peerid ...string) []byte
 
 		GetProtocols(id string) ([]string, error)
+
+		// =============== world ==================>
+		WorldConns() (direct []string, relay []string)
+		WorldPeers() (direct []string, relay map[string][]string, total int)
+		RoutingTable(world bool) ([]peer.ID, error) // find in kbuckets
+		PeersWithDirection(world bool) (direct []PeerDirection, relay map[PeerDirection][]PeerDirection, total int)
+		Table(world bool) map[string][]string // map => {id:addrs}
 	}
 )

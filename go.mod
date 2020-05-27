@@ -6,6 +6,7 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.0.5
+	github.com/ipfs/go-detect-race v0.0.1
 	github.com/ipfs/go-ipns v0.0.2
 	github.com/ipfs/go-log v1.0.4
 	github.com/libp2p/go-buffer-pool v0.0.2
@@ -29,8 +30,8 @@ go 1.13
 
 replace github.com/libp2p/go-libp2p-discovery => github.com/cc14514/go-libp2p-discovery v0.0.0-20200509061928-ab91365d125c
 
-replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.3-rc0
+replace github.com/libp2p/go-libp2p-kad-dht => ../go-libp2p-kad-dht
 
-replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.3-rc1
+replace github.com/libp2p/go-libp2p => ../go-libp2p
 
 replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-rc0

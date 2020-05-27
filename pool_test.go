@@ -55,3 +55,16 @@ func TestTChan(t *testing.T) {
 
 	<-time.After(1 * time.Second)
 }
+
+func TestChan2(t *testing.T) {
+	c1 := make(chan int, 1)
+
+	go func() {
+		fmt.Println("start recv c1")
+		c := <-c1
+		fmt.Println("11111111 = ", c)
+	}()
+	c1 <- 8
+	fmt.Println("ok.")
+	<-time.After(1 * time.Second)
+}
