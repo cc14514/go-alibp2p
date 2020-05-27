@@ -996,7 +996,7 @@ func (self *Service) conns(world bool) (direct []string, relay []string) {
 func (self *Service) excludeWorld(world bool, p string) bool {
 	if !world {
 		a := strings.Split(p, "/p2p/")
-		if len(a) > 0 {
+		if len(a) > 1 {
 			p = a[1]
 		}
 		gid, err := self.GetPeerMeta(p, "Groupid")
