@@ -995,10 +995,6 @@ func (self *Service) conns(world bool) (direct []string, relay []string) {
 
 func (self *Service) excludeWorld(world bool, p string) bool {
 	if !world {
-		a := strings.Split(p, "/p2p/")
-		if len(a) > 1 {
-			p = a[1]
-		}
 		gid, err := self.GetPeerMeta(p, "Groupid")
 		log.Infof("excludeWorld %s gid=%v mygid=%v, err=%v", p, gid, self.cfg.Groupid, err)
 		if err != nil || gid.(string) != self.cfg.Groupid {
@@ -1012,19 +1008,19 @@ func (self *Service) peers(world bool) (direct []string, relay map[string][]stri
 	direct, relay, total = make([]string, 0), make(map[string][]string), 0
 	dl, rl := self.Conns()
 	for _, d := range dl {
-		if self.excludeWorld(world, d) {
+		p := strings.Split(d, "/p2p/")[1]
+		if self.excludeWorld(world, p) {
 			continue
 		}
-		direct = append(direct, strings.Split(d, "/p2p/")[1])
+		direct = append(direct, p)
 		total += 1
 	}
 	for _, r := range rl {
-		if self.excludeWorld(world, r) {
-			continue
-		}
 		arr := strings.Split(r, "/p2p-circuit")
 		f, t := arr[0], arr[1]
-
+		if self.excludeWorld(world, t) {
+			continue
+		}
 		rarr, ok := relay[strings.Split(f, "/p2p/")[1]]
 		if !ok {
 			rarr = make([]string, 0)
