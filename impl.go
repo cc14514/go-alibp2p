@@ -671,7 +671,8 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 						err = fmt.Errorf("in blacklist : pre addrs is : %v", blk)
 						return
 					}
-					for i := 0; i < 20; i++ {
+					// timeout : 4s
+					for i := 0; i < 8; i++ {
 						<-t.C
 						gid, err := n.Peerstore().Get(conn.RemotePeer(), "Groupid")
 						log.Infof("OnConnectedEvent-WaitIDService>> %d , gid=%s , id=%s , addrs=%v", i, gid, conn.RemotePeer().Pretty(), conn.RemoteMultiaddr())
