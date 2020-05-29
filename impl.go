@@ -845,8 +845,10 @@ func (self *Service) grouplinker() {
 
 		advertiseSelfToWorld = func() {
 			self.SetAdvertiseTTL(gkey, 120*time.Second)
-			self.Advertise(worldctx(ctx), gkey)
-			log.Infof("grouplinker-advertiseSelfToWorld : %s", gkey)
+			if !self.cfg.DisableInbound {
+				self.Advertise(worldctx(ctx), gkey)
+				log.Infof("grouplinker-advertiseSelfToWorld : %s", gkey)
+			}
 		}
 
 		tryJoinToGroup = func() error {
