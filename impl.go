@@ -999,7 +999,7 @@ func (self *Service) conns(world bool) (direct []string, relay []string) {
 func (self *Service) excludeWorld(world bool, p string) bool {
 	if !world {
 		gid, err := self.GetPeerMeta(p, "Groupid")
-		log.Infof("excludeWorld %s gid=%v mygid=%v, err=%v", p, gid, self.cfg.Groupid, err)
+		log.Debugf("excludeWorld %s gid=%v mygid=%v, err=%v", p, gid, self.cfg.Groupid, err)
 		if err != nil || gid.(string) != self.cfg.Groupid {
 			return true
 		}
@@ -1161,13 +1161,13 @@ func (self *Service) bootstrap() error {
 							// TODO : 新版本 可以重复调用 bootstrap
 							log.Debug("alibp2p-service::bootstrap success")
 							if atomic.CompareAndSwapInt32(&loopbootstrap, 0, 1) {
-								log.Info("alibp2p-service::Bootstrap the host")
+								log.Debug("alibp2p-service::Bootstrap the host")
 								err = self.router.Bootstrap(self.ctx)
 								if err != nil {
 									log.Infof("alibp2p-service::bootstrap-error : %v", err)
 								}
 							} else {
-								log.Info("alibp2p-service::Reconnected and bootstrap the host once")
+								log.Debug("alibp2p-service::Reconnected and bootstrap the host once")
 								self.BootstrapOnce()
 							}
 						} else if total > 0 {

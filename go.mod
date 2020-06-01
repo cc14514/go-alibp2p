@@ -34,7 +34,7 @@ replace github.com/libp2p/go-libp2p-discovery => github.com/cc14514/go-libp2p-di
 replace github.com/libp2p/go-libp2p-kad-dht => github.com/cc14514/go-libp2p-kad-dht v0.0.4-rc1
 
 //replace github.com/libp2p/go-libp2p => ../go-libp2p
-replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.4-rc0
+replace github.com/libp2p/go-libp2p => github.com/cc14514/go-libp2p v0.0.4-rc1
 
 
 replace github.com/libp2p/go-libp2p-circuit => github.com/cc14514/go-libp2p-circuit v0.0.3-rc0
