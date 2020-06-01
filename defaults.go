@@ -22,7 +22,6 @@ package alibp2p
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"math/big"
 )
@@ -41,9 +40,7 @@ var defaults = []struct {
 	{
 		fallback: func(cfg *Config) bool { return cfg.Networkid == nil },
 		opt: func(cfg *Config) error {
-			b, _ := hex.DecodeString(HexSHA1("pdx"))
-			cfg.Networkid = new(big.Int).SetBytes(b)
-			log.Infof("Networkid = %s", cfg.Networkid.String())
+			cfg.Networkid = big.NewInt(111)
 			return nil
 		},
 	},
@@ -79,13 +76,6 @@ var defaults = []struct {
 		fallback: func(cfg *Config) bool { return cfg.PrivKey == nil && cfg.Homedir == "" },
 		opt: func(cfg *Config) error {
 			return errors.New("privateKey and homedir both empty")
-		},
-	},
-	{
-		fallback: func(cfg *Config) bool { return cfg.Groupid == "" },
-		opt: func(cfg *Config) error {
-			cfg.Groupid = "cc14514"
-			return nil
 		},
 	},
 }

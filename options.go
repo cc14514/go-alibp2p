@@ -64,23 +64,17 @@ func Identity(priv *ecdsa.PrivateKey) Option {
 	}
 }
 
-func NetworkId(networkid uint64) Option {
+func Network(port, muxport, networkid uint64) Option {
 	return func(cfg *Config) error {
+		mp := new(big.Int)
 		nid := new(big.Int)
+		if muxport > 0 {
+			mp = mp.SetUint64(muxport)
+		}
 		if networkid > 0 {
 			nid = nid.SetUint64(networkid)
 		}
 		cfg.Networkid = nid
-		return nil
-	}
-}
-
-func Network(port, muxport uint64) Option {
-	return func(cfg *Config) error {
-		mp := new(big.Int)
-		if muxport > 0 {
-			mp = mp.SetUint64(muxport)
-		}
 		cfg.Port = port
 		cfg.MuxPort = mp
 		return nil
@@ -147,13 +141,6 @@ func Relay(Relay bool) Option {
 func DisableInbound(DisableInbound bool) Option {
 	return func(cfg *Config) error {
 		cfg.DisableInbound = DisableInbound
-		return nil
-	}
-}
-
-func Groupid(gid string) Option {
-	return func(cfg *Config) error {
-		cfg.Groupid = gid
 		return nil
 	}
 }
