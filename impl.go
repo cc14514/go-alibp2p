@@ -655,12 +655,33 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 			case network.DirOutbound:
 				in = false
 			}
-			func() {
-				log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
-				callbackFn(in, sid, pubkey)
-				log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
+			go func() {
+				t := 100 * time.Millisecond
+				tc := time.NewTimer(t)
+				defer func() {
+					tc.Stop()
+				}()
+				for i := 0; i < 20; i++ {
+					/* When IDService successed then to active the OnConnectedEvent , max wait 2s;
+					ids.Host.Peerstore().Put(p, "ProtocolVersion", pv)
+					ids.Host.Peerstore().Put(p, "AgentVersion", av)
+					*/
+					//fmt.Println("===============================", i)
+					_, err1 := self.GetPeerMeta(conn.RemotePeer().Pretty(), "ProtocolVersion")
+					_, err2 := self.GetPeerMeta(conn.RemotePeer().Pretty(), "AgentVersion")
+					//fmt.Println("ProtocolVersion", err1, pv)
+					//fmt.Println("AgentVersion", err2, av)
+					//fmt.Println("===============================", i)
+					if err1 == nil && err2 == nil {
+						log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
+						callbackFn(in, sid, pubkey)
+						log.Infof("alibp2p-service::OnConnected-callbackFn-end id=%s", conn.RemotePeer().Pretty())
+						return
+					}
+					<-tc.C
+					tc.Reset(t)
+				}
 			}()
-
 		},
 	})
 }
