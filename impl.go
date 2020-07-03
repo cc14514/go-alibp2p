@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	netmux "github.com/cc14514/go-mux-transport"
 	"github.com/ipfs/go-cid"
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
@@ -93,7 +92,7 @@ func newService(cfg Config) Alibp2pService {
 	if cfg.MuxPort != nil && cfg.MuxPort.Int64() > 0 {
 		listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/%d:%d", cfg.MuxPort, cfg.Port))
 		list = append(list, listen1)
-		netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
+		//netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
 	}
 
 	bwc := metrics.NewBandwidthCounter()
