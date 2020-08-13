@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const logvsn = "0.0.3-200602-dev-1"
+const logvsn = "0.0.3-rc5-200813-dev-001"
 
 const (
 	NamespaceDHT          = "cc14514"

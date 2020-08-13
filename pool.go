@@ -40,8 +40,6 @@ type (
 		ctx    context.Context
 		reader *bytes.Buffer
 		writer *bytes.Buffer
-		//rCh    chan *RawData
-		//wCh chan *RawData
 	}
 	reuse_stream struct {
 		expire int64
@@ -51,11 +49,9 @@ type (
 	SessionKey   string
 	AStreamCache struct {
 		// { aconnkey -> { session -> conn } }
-		pool map[StreamKey]map[SessionKey]*reuse_stream
-		reg  map[string]StreamHandler
-		//reglock  *sync.Map
+		pool   map[StreamKey]map[SessionKey]*reuse_stream
+		reg    map[string]interface{}
 		kmutex *KeyMutex
-		//reglock map[string]*sync.Mutex
 		lock   *sync.RWMutex
 		msgc   metrics.Reporter
 		expire int64
@@ -110,7 +106,7 @@ func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 	return &AStreamCache{
 		pool: make(map[StreamKey]map[SessionKey]*reuse_stream),
 		lock: new(sync.RWMutex),
-		reg:  make(map[string]StreamHandler),
+		reg:  make(map[string]interface{}),
 		//reglock: new(sync.Map),
 		kmutex: NewKeyMutex(45 * time.Second),
 		//reglock: make(map[string]*sync.Mutex),
@@ -224,7 +220,8 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 			reader: new(bytes.Buffer),
 			writer: new(bytes.Buffer),
 		}
-		logid = time.Now().UnixNano()
+		logid    = time.Now().UnixNano()
+		protocol = string(s.Protocol())
 	)
 	log.Infof("%d# alibp2p-service::HandleStream-start %s@%s inbound=%v", logid, pid, id, s.Conn().Stat().Direction == network.DirInbound)
 	defer func() {
@@ -235,10 +232,19 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 	// TODO How to return error to the handlerFn ?
 	for {
 		var (
-			ret []byte
-			req = new(RawData)
-			err error
-			c   int64
+			ret         []byte
+			req         = new(RawData)
+			err         error
+			c           int64
+			callHandler = func(handler interface{}) error {
+				if fn, ok := handler.(StreamHandler); ok {
+					return fn(sid, pubkeyToEcdsa(pk), rw)
+				}
+				if fn, ok := handler.(StreamHandlerWithProtocol); ok {
+					return fn(sid, protocol, pubkeyToEcdsa(pk), rw)
+				}
+				return unknow_stream_handler_type
+			}
 		)
 		c, err = FromReader(s, req)
 		if req.Err != "" {
@@ -252,7 +258,7 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 		} else if _, err = rw.reader.Write(req.Data); err != nil {
 			log.Errorf("%d# alibp2p-service::HandleStream_rw %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
-		} else if err = p.reg[pid](sid, pubkeyToEcdsa(pk), rw); err != nil {
+		} else if err = callHandler(p.reg[pid]); err != nil {
 			log.Errorf("%d# alibp2p-service::HandleStream_fn %s@%s read_size=%d err=%v", logid, pid, id, c, err)
 			cancel()
 		} else if ret, err = ioutil.ReadAll(rw.writer); err != nil {
@@ -287,13 +293,16 @@ func (p *AStreamCache) doHandleStream(s network.Stream) {
 
 }
 
-func (p *AStreamCache) regist(pid string, handler StreamHandler) {
+func (p *AStreamCache) regist(pid string, handler interface{}) {
+	_, ok1 := handler.(StreamHandler)
+	_, ok2 := handler.(StreamHandlerWithProtocol)
+	if !ok1 && !ok2 {
+		panic(unknow_stream_handler_type)
+	}
 	if _, ok := p.reg[pid]; ok {
 		panic("alibp2p-service::ReuseStreamHandler Duplicate Registration")
 	}
 	p.reg[pid] = handler
-	//p.reglock[pid] = new(sync.Mutex)
-	//p.reglock.Store(pid, make(chan struct{}))
 	p.kmutex.Regist(pid)
 }
 
@@ -308,72 +317,3 @@ func (p *AStreamCache) cleanlock(id, pid string) {
 func (p *AStreamCache) unlock(id, pid string) error {
 	return p.kmutex.Unlock(pid, id)
 }
-
-/*
-
-func (p *AStreamCache) takelock(id, pid string) (err error) {
-	_, ok := p.reglock.Load(pid)
-	if ok {
-		v, ok := p.reglock.LoadOrStore(pid+id, make(chan struct{}, 1))
-		log.Debugf("alibp2p-service::AStreamCache-lock:try : %s@%s load=%v", pid, id, ok)
-		t := time.NewTimer(30 * time.Second)
-		defer func() {
-			t.Stop()
-			if recover() != nil {
-				err = fmt.Errorf("take lock fail , lost stream : %s@%s", pid, id)
-			}
-		}()
-		select {
-		case v.(chan struct{}) <- struct{}{}:
-			log.Debugf("alibp2p-service::AStreamCache-lock:success : %s@%s", pid, id)
-		case <-t.C:
-			log.Debugf("alibp2p-service::AStreamCache-lock:timeout : %s@%s", pid, id)
-			err = fmt.Errorf("take lock timeout : %s@%s", pid, id)
-		}
-	}
-	return
-}
-
-func (p *AStreamCache) cleanlock(id, pid string) {
-	if id == "" || pid == "" {
-		return
-	}
-	if v, ok := p.reglock.Load(pid + id); ok {
-		p.reglock.Delete(pid + id)
-		defer func() {
-			if r := recover(); r != nil {
-				// ignoe
-			}
-		}()
-		close(v.(chan struct{}))
-	}
-	log.Debugf("alibp2p-service::AStreamCache-cleanlock : %s@%s", pid, id)
-}
-
-func (p *AStreamCache) unlock(id, pid string) (err error) {
-	_, ok := p.reglock.Load(pid)
-	if ok {
-		v, ok := p.reglock.Load(pid + id)
-		log.Debugf("alibp2p-service::AStreamCache-unlock:try %s@%s load=%v", pid, id, ok)
-		if ok {
-			t := time.NewTimer(30 * time.Second)
-			defer func() {
-				t.Stop()
-				if recover() != nil {
-					err = fmt.Errorf("release lock fail , lost stream : %s@%s", pid, id)
-				}
-			}()
-			select {
-			case <-v.(chan struct{}):
-				log.Debugf("alibp2p-service::AStreamCache-unlock:success : %s@%s", pid, id)
-				return nil
-			case <-t.C:
-				log.Debugf("alibp2p-service::AStreamCache-unlock:timeout : %s@%s", pid, id)
-				return fmt.Errorf("release lock timeout : %s@%s", pid, id)
-			}
-		}
-	}
-	return nil
-}
-
-*/

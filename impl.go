@@ -244,32 +244,52 @@ func (self *Service) Myid() (id string, addrs []string) {
 
 func (self *Service) SetHandler(pid string, handler StreamHandler) {
 	self.checkReuse(pid)
-	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) {
-		if handler == nil {
-			return
-		}
-		self.msgc.LogRecvMessage(1)
-		self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
-		defer func() {
-			if s != nil {
-				go helpers.FullClose(s)
-			}
-		}()
-		conn := s.Conn()
-		sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-		pk, err := id2pubkey(s.Conn().RemotePeer())
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		pubkeyToEcdsa(pk)
-		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
-			log.Error(err)
-		}
-	})
+	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) { self.callHandler(s, handler) })
 }
 
 func (self *Service) SetHandlerReuseStream(pid string, handler StreamHandler) {
+	self.asc.regist(pid, handler)
+	self.host.SetStreamHandler(protocol.ID(pid), self.asc.handleStream)
+}
+
+func (self *Service) callHandler(s network.Stream, fn interface{}) {
+	if fn == nil {
+		return
+	}
+	self.msgc.LogRecvMessage(1)
+	self.msgc.LogRecvMessageStream(1, s.Protocol(), s.Conn().RemotePeer())
+	defer func() {
+		if s != nil {
+			go helpers.FullClose(s)
+		}
+	}()
+	conn := s.Conn()
+	sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
+	pk, err := id2pubkey(s.Conn().RemotePeer())
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	pubkeyToEcdsa(pk)
+	if handler, ok := fn.(StreamHandler); ok {
+		if err := handler(sid, pubkeyToEcdsa(pk), s); err != nil {
+			log.Error(err)
+		}
+	} else if handler, ok := fn.(StreamHandlerWithProtocol); ok {
+		if err := handler(sid, string(s.Protocol()), pubkeyToEcdsa(pk), s); err != nil {
+			log.Error(err)
+		}
+	} else {
+		panic(unknow_stream_handler_type)
+	}
+}
+
+func (self *Service) SetHandlerWithProtocol(pid string, handler StreamHandlerWithProtocol) {
+	self.checkReuse(pid)
+	self.host.SetStreamHandler(protocol.ID(pid), func(s network.Stream) { self.callHandler(s, handler) })
+}
+
+func (self *Service) SetHandlerReuseStreamWithProtocol(pid string, handler StreamHandlerWithProtocol) {
 	self.asc.regist(pid, handler)
 	self.host.SetStreamHandler(protocol.ID(pid), self.asc.handleStream)
 }
@@ -439,21 +459,10 @@ func (self *Service) sendMsg(to, protocolID string, msg []byte, timeout time.Tim
 		self.msgc.LogSentMessageStream(1, protocol.ID(protocolID), peerid)
 	}()
 
-	/*	setWriteTimeout := func(s network.Stream, timeout time.Time) {
-		var tot = notimeout
-		if timeout != notimeout {
-			tot = timeout
-		}
-		s.SetWriteDeadline(tot)
-	}*/
-
 	if self.asc.has(protocolID) {
 		ok, expire := false, false
 		if s, ok, expire = self.asc.get(to, protocolID); ok {
 			req := NewRawData(nil, msg)
-			// 强制超时
-			//setWriteTimeout(s, timeout)
-			//defer s.SetWriteDeadline(notimeout)
 			_total, err2 := ToWriter(s, req)
 			if err2 != nil {
 				err = err2
@@ -665,12 +674,8 @@ func (self *Service) OnConnectedEvent(t ConnType, callbackFn ConnectEventFn) {
 					ids.Host.Peerstore().Put(p, "ProtocolVersion", pv)
 					ids.Host.Peerstore().Put(p, "AgentVersion", av)
 					*/
-					//fmt.Println("===============================", i)
 					_, err1 := self.GetPeerMeta(conn.RemotePeer().Pretty(), "ProtocolVersion")
 					_, err2 := self.GetPeerMeta(conn.RemotePeer().Pretty(), "AgentVersion")
-					//fmt.Println("ProtocolVersion", err1, pv)
-					//fmt.Println("AgentVersion", err2, av)
-					//fmt.Println("===============================", i)
 					if err1 == nil && err2 == nil {
 						log.Infof("alibp2p-service::OnConnected-callbackFn-start id=%s", conn.RemotePeer().Pretty())
 						callbackFn(in, sid, pubkey)
@@ -751,14 +756,6 @@ func (self *Service) OnDisconnected(callback DisconnectEvent) {
 				c.RemotePeer()
 			}
 			sid := fmt.Sprintf("session:%s%s", conn.RemoteMultiaddr().String(), conn.LocalMultiaddr().String())
-			/*
-				for _, s := range conn.GetStreams() {
-					if self.asc.has(string(s.Protocol())) {
-						log.Infof("alibp2p::OnDisconnected::clean-stream-cache id=%s , protocolID=%s", conn.RemotePeer().Pretty(), s.Protocol())
-						self.asc.del(s)
-					}
-				}
-			*/
 			callback(sid, pubkeyToEcdsa(pk))
 		},
 	})

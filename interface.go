@@ -30,11 +30,9 @@ import (
 )
 
 type (
-	StreamHandler func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error
-
-	//ReuseStreamReader  func() (*RawData, error)
-	//ReuseStreamWriter  func(*RawData) error
-	//ReuseStreamHandler func(ctx context.Context, sessionId string, pubkey *ecdsa.PublicKey, r ReuseStreamReader, w ReuseStreamWriter) error
+	// Deprecated: Use StreamHandlerWithProtocol and SetHandlerWithProtocol / SetHandlerReuseStreamWithProtocol .
+	StreamHandler             func(sessionId string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error
+	StreamHandlerWithProtocol func(sessionId, protocol string, pubkey *ecdsa.PublicKey, rw io.ReadWriter) error
 
 	PreMsg         func() (string, []byte)
 	ConnectEventFn func(inbound bool, sessionId string, pubKey *ecdsa.PublicKey)
@@ -55,9 +53,14 @@ type (
 		Connect(url string) error
 		ClosePeer(pubkey *ecdsa.PublicKey) error
 		SetBootnode(peer ...string) error
+
+		// Deprecated: Use SetHandlerWithProtocol
 		SetHandler(pid string, handler StreamHandler)
-		//SetHandlerWithTimeout(pid string, handler StreamHandler, readTimeout time.Duration)
+		// Deprecated: Use SetHandlerReuseStreamWithProtocol
 		SetHandlerReuseStream(pid string, handler StreamHandler)
+
+		SetHandlerWithProtocol(pid string, handler StreamHandlerWithProtocol)
+		SetHandlerReuseStreamWithProtocol(pid string, handler StreamHandlerWithProtocol)
 
 		SendMsgAfterClose(to, protocolID string, msg []byte) error
 		Request(to, proto string, msg []byte) ([]byte, error)
@@ -101,30 +104,7 @@ type (
 		Advertise(ctx context.Context, ns string)
 
 		FindProviders(ctx context.Context, ns string, limit int) ([]string, error)
-		/*
-			{
-			  "alibp2p-counter": {
-			    "bw": {
-			      "total-in": "643197",
-			      "total-out": "5696915",
-			      "rate-in": "20.28",
-			      "rate-out": "596.35"
-			    },
-			    "rw": {
-			      "total-in": "100219",
-			      "total-out": "20147",
-			      "avg-in": "3.17",
-			      "avg-out": "0.63"
-			    },
-			    "msg": {
-			      "total-in": "9",
-			      "total-out": "20084",
-			      "avg-in": "0.00",
-			      "avg-out": "0.63"
-			    }
-			  }
-			}
-		*/
+
 		Report(peerid ...string) []byte
 
 		GetProtocols(id string) ([]string, error)
