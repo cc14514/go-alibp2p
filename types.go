@@ -20,7 +20,8 @@ import (
 	"time"
 )
 
-var ns_notfound error = errors.New("Namespace not registed")
+var ns_notfound = errors.New("Namespace not registed")
+var unknow_stream_handler_type = errors.New("Unknow Stream Handler Type")
 
 type (
 	RawData struct {

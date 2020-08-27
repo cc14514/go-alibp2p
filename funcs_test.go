@@ -21,11 +21,15 @@
 package alibp2p
 
 import (
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/golang/snappy"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -328,4 +332,39 @@ func TestCid(t *testing.T) {
 	hk2, err := multihash.Cast([]byte(hk))
 	t.Log(hk2, err)
 	t.Log(hk2.HexString())
+}
+
+func TestCompress(t *testing.T) {
+	s256 := sha256.New()
+	src := make(map[int]string)
+	for i := 0; i < 15000; i++ {
+		s256.Write([]byte(fmt.Sprintf("%d", i)))
+		h := s256.Sum(nil)
+		src[i] = hex.EncodeToString(h)
+		s256.Reset()
+	}
+	buf, _ := json.Marshal(src)
+	t.Log("source : ", len(buf))
+	s := time.Now()
+	data := snappy.Encode(nil, buf)
+	e := time.Since(s)
+	t.Logf("snappy : %d , %.3f , %v\r\n", len(data), float64(1)-float64(len(data))/float64(len(buf)), e)
+
+	s = time.Now()
+	buf2 := new(bytes.Buffer)
+	w := gzip.NewWriter(buf2)
+	_, _ = w.Write(buf)
+	e = time.Since(s)
+	t.Logf("gzip: %d , %.3f , %v\r\n", len(buf2.Bytes()), float64(1)-float64(len(buf2.Bytes()))/float64(len(buf)), e)
+
+	s = time.Now()
+	buf3 := new(bytes.Buffer)
+	w3 := zip.NewWriter(buf3)
+	_w3, _ := w3.Create("foo")
+	_, _ = _w3.Write(buf)
+	e = time.Since(s)
+	t.Logf("zip: %d , %.3f , %v\r\n", len(buf3.Bytes()), float64(1)-float64(len(buf3.Bytes()))/float64(len(buf)), e)
+
+
+
 }
