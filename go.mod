@@ -4,6 +4,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cc14514/go-mux-transport v0.0.3-rc0
 	github.com/gogo/protobuf v1.3.1
+	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.0.5
