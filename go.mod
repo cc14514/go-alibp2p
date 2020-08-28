@@ -25,6 +25,7 @@ require (
 	github.com/multiformats/go-multihash v0.0.13
 	github.com/tendermint/go-amino v0.0.0-20200130113325-59d50ef176f6
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
+	github.com/libp2p/go-libp2p-pubsub v0.2.7
 )
 
 go 1.13

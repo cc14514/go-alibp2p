@@ -25,6 +25,7 @@ import (
 	"crypto/ecdsa"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"io"
 	"time"
 )
@@ -45,6 +46,9 @@ type (
 		SetStreamHandler(protoid string, handler func(s network.Stream))
 		SendMsg(to, protocolID string, msg []byte) (peer.ID, network.Stream, int, error)
 		Nodekey() *ecdsa.PrivateKey
+		//Host() host.Host
+		//Router() routing.Routing
+		Pubsub() *pubsub.PubSub
 	}
 
 	Alibp2pService interface {

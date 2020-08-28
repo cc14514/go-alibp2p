@@ -23,6 +23,7 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
 	"io/ioutil"
@@ -150,6 +151,11 @@ func newService(cfg Config) Alibp2pService {
 		panic(err)
 	}
 
+	_ps, err := pubsub.NewGossipSub(context.Background(), host, pubsub.WithDiscovery(discovery.NewRoutingDiscovery(router)))
+	if err != nil {
+		panic(err)
+	}
+
 	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", host.ID().Pretty()))
 	for i, addr := range host.Addrs() {
 		full := addr.Encapsulate(hostAddr)
@@ -166,6 +172,7 @@ func newService(cfg Config) Alibp2pService {
 	service := &Service{
 		cfg:              cfg,
 		ctx:              cfg.Ctx,
+		ps:               _ps,
 		homedir:          cfg.Homedir,
 		host:             host,
 		router:           router,
@@ -1129,4 +1136,16 @@ func (self *Service) RoutingTable() ([]peer.ID, error) {
 		return nil, errors.New("router type error")
 	}
 	return dht.RoutingTable().ListPeers(), nil
+}
+
+func (self *Service) Pubsub() *pubsub.PubSub {
+	return self.ps
+}
+
+func (self *Service) Host() host.Host {
+	return self.host
+}
+
+func (self *Service) Router() routing.Routing {
+	return self.router
 }

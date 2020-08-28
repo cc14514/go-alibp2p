@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"io"
 	"math/big"
 	"strings"
@@ -33,6 +34,7 @@ type (
 	SimplePacketHead []byte
 
 	Service struct {
+		ps               *pubsub.PubSub
 		ctx              context.Context
 		homedir          string
 		host             host.Host
