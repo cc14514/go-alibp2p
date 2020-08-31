@@ -1193,9 +1193,10 @@ func (service *Service) Unsubscribe(_topic string) error {
 	service.topicsMutex.Lock()
 	defer service.topicsMutex.Unlock()
 	po, ok := service.topics[_topic]
+	delete(service.topics, _topic)
 	if !ok {
 		return fmt.Errorf("The topic [%s] notfound", _topic)
 	}
 	po.sub.Cancel()
-	return nil
+	return po.topic.Close()
 }
