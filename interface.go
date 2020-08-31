@@ -25,7 +25,6 @@ import (
 	"crypto/ecdsa"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"io"
 	"time"
 )
@@ -48,7 +47,6 @@ type (
 		Nodekey() *ecdsa.PrivateKey
 		//Host() host.Host
 		//Router() routing.Routing
-		Pubsub() *pubsub.PubSub
 	}
 
 	Alibp2pService interface {
@@ -112,5 +110,15 @@ type (
 		Report(peerid ...string) []byte
 
 		GetProtocols(id string) ([]string, error)
+
+		Pubsub() TopicService
+	}
+
+	PubsubCallback func(From, ReceivedFrom peer.ID, data []byte)
+
+	TopicService interface {
+		Publish(topic string, msg []byte) error
+		Subscribe(topic string, callbackFn PubsubCallback) error
+		Unsubscribe(topic string) error
 	}
 )

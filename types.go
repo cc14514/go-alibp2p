@@ -33,6 +33,11 @@ type (
 
 	SimplePacketHead []byte
 
+	pubsubObj struct {
+		topic *pubsub.Topic
+		sub   *pubsub.Subscription
+	}
+
 	Service struct {
 		ps               *pubsub.PubSub
 		ctx              context.Context
@@ -48,6 +53,9 @@ type (
 		asc              *AStreamCache
 		nsttl            map[string]time.Duration
 		clientProtocols  map[string]struct{}
+		// for pubsub
+		topics           map[string]*pubsubObj
+		topicsMutex      sync.Mutex
 	}
 
 	blankValidator struct{}
