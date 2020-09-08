@@ -115,10 +115,11 @@ type (
 	}
 
 	PubsubCallback func(From, ReceivedFrom peer.ID, data []byte)
+	PubsubValdator func(From, ReceivedFrom peer.ID, data []byte) bool
 
 	TopicService interface {
 		Publish(topic string, msg []byte) error
-		Subscribe(topic string, callbackFn PubsubCallback) error
+		Subscribe(topic string, callbackFn PubsubCallback, opts ...TopicOption) error
 		Unsubscribe(topic string) error
 	}
 )

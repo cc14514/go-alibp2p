@@ -144,3 +144,10 @@ func DisableInbound(DisableInbound bool) Option {
 		return nil
 	}
 }
+
+func WithValidator(v PubsubValdator) TopicOption {
+	return func(cfg *TopicConfig) error {
+		cfg.valdator = v
+		return nil
+	}
+}

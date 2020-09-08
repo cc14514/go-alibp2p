@@ -1161,9 +1161,19 @@ func (service *Service) Publish(_topic string, msg []byte) error {
 	return topic.topic.Publish(service.ctx, msg)
 }
 
-func (service *Service) Subscribe(_topic string, callbackFn PubsubCallback) error {
+func (service *Service) Subscribe(_topic string, callbackFn PubsubCallback, opts ...TopicOption) error {
 	service.topicsMutex.Lock()
 	defer service.topicsMutex.Unlock()
+	var topicCfg = &TopicConfig{
+		throttle: 50,
+		timeout:  2 * time.Second,
+		inline:   false,
+		valdator: nil,
+	}
+	err := topicCfg.Apply(opts...)
+	if err != nil {
+		return err
+	}
 	_, ok := service.topics[_topic]
 	if ok {
 		return fmt.Errorf("The topic [%s] already subscribe.", _topic)
@@ -1172,6 +1182,18 @@ func (service *Service) Subscribe(_topic string, callbackFn PubsubCallback) erro
 	if err != nil {
 		return err
 	}
+
+	if topicCfg.valdator != nil {
+		if err = service.ps.RegisterTopicValidator(_topic, func(i context.Context, id peer.ID, message *pubsub.Message) bool {
+			return topicCfg.valdator(message.GetFrom(), message.ReceivedFrom, message.Data)
+		},
+			pubsub.WithValidatorConcurrency(topicCfg.throttle),
+			pubsub.WithValidatorInline(topicCfg.inline),
+			pubsub.WithValidatorTimeout(topicCfg.timeout)); err != nil {
+			return err
+		}
+	}
+
 	sub, err := topic.Subscribe()
 	if err != nil {
 		return err
@@ -1197,6 +1219,10 @@ func (service *Service) Unsubscribe(_topic string) error {
 	if !ok {
 		return fmt.Errorf("The topic [%s] notfound", _topic)
 	}
+	if err := service.ps.UnregisterTopicValidator(_topic); err != nil {
+		return err
+	}
 	po.sub.Cancel()
 	return po.topic.Close()
+
 }

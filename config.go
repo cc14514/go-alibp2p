@@ -63,6 +63,27 @@ func (cfg *Config) Apply(opts ...Option) error {
 	return nil
 }
 
+type TopicConfig struct {
+	throttle int
+	timeout  time.Duration
+	inline   bool
+	valdator PubsubValdator
+}
+
+type TopicOption func(cfg *TopicConfig) error
+
+func (cfg *TopicConfig) Apply(opts ...TopicOption) error {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(cfg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 var (
 	pubkeyCache, _ = lru.New(10000)
 	//DefaultProtocols        = []protocol.ID{ProtocolDHT}
