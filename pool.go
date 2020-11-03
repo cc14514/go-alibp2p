@@ -33,7 +33,7 @@ import (
 	"time"
 )
 
-const def_expire = 30 * 60 // 10sec for debug
+//const def_expire = 30 // 10sec for debug
 
 type (
 	reuse_conn struct {
@@ -42,7 +42,7 @@ type (
 		writer *bytes.Buffer
 	}
 	reuse_stream struct {
-		expire int64
+		//expire int64
 		stream network.Stream
 	}
 	StreamKey    string
@@ -111,7 +111,7 @@ func NewAStreamCatch(msgc metrics.Reporter) *AStreamCache {
 		kmutex: NewKeyMutex(45 * time.Second),
 		//reglock: make(map[string]*sync.Mutex),
 		msgc:   msgc,
-		expire: def_expire,
+		//expire: def_expire,
 	}
 }
 
@@ -161,11 +161,11 @@ func (p *AStreamCache) get(to, protoid string) (network.Stream, bool, bool) {
 	if !ok {
 		return nil, false, false
 	}
-	for k, v := range sm {
-		if v.expire < time.Now().Unix() {
-			log.Info("alibp2p-service::AStreamCache-get-expire", v.expire, to, protoid, k)
-			return v.stream, false, true
-		}
+	for _, v := range sm {
+		//if v.expire < time.Now().Unix() {
+		//	log.Info("alibp2p-service::AStreamCache-get-expire", v.expire, to, protoid, k)
+		//	return v.stream, false, true
+		//}
 		log.Debug("alibp2p-service::AStreamCache-get", "id", to, "protoid", protoid, "asc.len", len(p.pool))
 		return v.stream, true, false
 	}
@@ -188,7 +188,7 @@ func (p *AStreamCache) put(s network.Stream, opts ...interface{}) {
 		return
 	}
 	sm[sessionkey] = &reuse_stream{
-		expire: time.Now().Add(time.Duration(p.expire) * time.Second).Unix(),
+		//expire: time.Now().Add(time.Duration(p.expire) * time.Second).Unix(),
 		stream: s,
 	}
 	p.pool[streamkey] = sm

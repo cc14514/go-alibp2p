@@ -81,6 +81,7 @@ func newService(cfg Config) Alibp2pService {
 		connHi = defConnHi
 	}
 	if cfg.PrivKey != nil {
+
 		_p := (*crypto.Secp256k1PrivateKey)(cfg.PrivKey)
 		priv = (crypto.PrivKey)(_p)
 	} else {
