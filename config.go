@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package alibp2p
 
 import (
@@ -116,19 +130,20 @@ func (cfg *Config) ProtectorOpt() (libp2p.Option, error) {
 
 /*
 // DefaultConfig is used to return a default configuration
-func DefaultConfig() *Config {
-	return &Config{
-		AcceptBacklog:          256,
-		EnableKeepAlive:        true,
-		KeepAliveInterval:      30 * time.Second,
-		ConnectionWriteTimeout: 10 * time.Second,
-		MaxStreamWindowSize:    initialStreamWindow,
-		LogOutput:              os.Stderr,
-		ReadBufSize:            4096,
-		MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
-		WriteCoalesceDelay:     100 * time.Microsecond,
+
+	func DefaultConfig() *Config {
+		return &Config{
+			AcceptBacklog:          256,
+			EnableKeepAlive:        true,
+			KeepAliveInterval:      30 * time.Second,
+			ConnectionWriteTimeout: 10 * time.Second,
+			MaxStreamWindowSize:    initialStreamWindow,
+			LogOutput:              os.Stderr,
+			ReadBufSize:            4096,
+			MaxMessageSize:         64 * 1024, // Means 64KiB/10s = 52kbps minimum speed.
+			WriteCoalesceDelay:     100 * time.Microsecond,
+		}
 	}
-}
 */
 func (cfg Config) MuxTransportOption(loglevel int) libp2p.Option {
 	ymxtpt := &yamux.Transport{

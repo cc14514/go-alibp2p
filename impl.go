@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package alibp2p
 
 import (
@@ -89,11 +103,14 @@ func newService(cfg Config) Alibp2pService {
 		cfg.PrivKey = (*ecdsa.PrivateKey)((priv).(*crypto.Secp256k1PrivateKey))
 	}
 	list := make([]ma.Multiaddr, 0)
-	listen0, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
-	list = append(list, listen0)
+	listen4tcp, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cfg.Port))
+	listen6tcp, _ := ma.NewMultiaddr(fmt.Sprintf("/ip6/::/tcp/%d", cfg.Port))
+	list = append(list, listen4tcp, listen6tcp)
 	if cfg.MuxPort != nil && cfg.MuxPort.Int64() > 0 {
-		listen1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/%d:%d", cfg.MuxPort, cfg.Port))
-		list = append(list, listen1)
+		muxPort := cfg.MuxPort.Int64()
+		listen4mux, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/mux/%d:%d", muxPort, cfg.Port))
+		listen6mux, _ := ma.NewMultiaddr(fmt.Sprintf("/ip6/::/mux/%d:%d", muxPort, cfg.Port))
+		list = append(list, listen4mux, listen6mux)
 		//netmux.Register(cfg.Ctx, int(cfg.MuxPort.Int64()), int(cfg.Port))
 	}
 
@@ -323,7 +340,7 @@ func (service *Service) SetStreamHandler(protoid string, handler func(s network.
 	})
 }
 
-//TODO add by liangc : connMgr protected / unprotected setting
+// TODO add by liangc : connMgr protected / unprotected setting
 func (service *Service) SendMsgAfterClose(to, protocolID string, msg []byte) error {
 	if service.asc.has(protocolID) {
 		log.Debug("alibp2p::SendMsgAfterClose-lock:try", "id", to, "protocolID", protocolID)
@@ -1075,8 +1092,8 @@ func (service *Service) Nodekey() *ecdsa.PrivateKey {
 	return service.cfg.PrivKey
 }
 
-//Protect(id, tag string)
-//Unprotect(id, tag string) bool
+// Protect(id, tag string)
+// Unprotect(id, tag string) bool
 func (service *Service) Protect(id, tag string) error {
 	p, err := peer.Decode(id)
 	if err != nil {
